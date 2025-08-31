@@ -1,0 +1,1629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered FRA Atlas & DSS</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        :root {
+            --primary: #2c5c1f;
+            --primary-light: #4a8c31;
+            --secondary: #3498db;
+            --accent: #e74c3c;
+            --warning: #f39c12;
+            --light-bg: #f5f7f9;
+            --dark-text: #333;
+            --light-text: #fff;
+            --sidebar-width: 320px;
+            --header-height: 70px;
+            --footer-height: 40px;
+        }
+        
+        body {
+            background-color: var(--light-bg);
+            color: var(--dark-text);
+            overflow-x: hidden;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-rows: var(--header-height) 1fr var(--footer-height);
+            min-height: 100vh;
+        }
+        
+        /* Header Styles */
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: var(--light-text);
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+        
+        .logo-icon {
+            font-size: 1.5em;
+        }
+        
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 20px;
+        }
+        
+        nav a {
+            color: var(--light-text);
+            text-decoration: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        nav a:hover, nav a.active {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .user-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .notification-btn, .user-btn {
+            color: var(--light-text);
+            font-size: 1.2em;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .notification-count {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: var(--accent);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 0.7em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-columns: var(--sidebar-width) 1fr;
+            overflow: hidden;
+        }
+        
+        /* Sidebar Styles */
+        .sidebar {
+            background: white;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .sidebar-section {
+            background: var(--light-bg);
+            border-radius: 8px;
+            padding: 15px;
+        }
+        
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary-light);
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .filter-group {
+            margin-bottom: 15px;
+        }
+        
+        .filter-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        select, input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+        }
+        
+        .layer-list {
+            list-style: none;
+        }
+        
+        .layer-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .layer-item:hover {
+            background: #f0f7ed;
+        }
+        
+        .layer-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        
+        .layer-toggle {
+            margin-left: auto;
+        }
+        
+        .stats-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .stat-card {
+            background: #f0f7ed;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 3px solid var(--primary-light);
+        }
+        
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        .stat-label {
+            font-size: 0.8em;
+            color: #666;
+        }
+        
+        /* Map Container */
+        .map-container {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        #map {
+            height: 100%;
+            width: 100%;
+        }
+        
+        .map-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+        
+        .control-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.2em;
+            color: var(--primary);
+        }
+        
+        .map-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .search-box {
+            display: flex;
+            margin-bottom: 15px;
+        }
+        
+        .search-box input {
+            flex: 1;
+            margin-top: 0;
+            border-right: none;
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+        
+        .search-box button {
+            background: var(--primary-light);
+            color: white;
+            border: none;
+            border-top-right-radius: 4px;
+            border-bottom-right-radius: 4px;
+            padding: 0 15px;
+            cursor: pointer;
+        }
+        
+        .village-info h3 {
+            margin-bottom: 10px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        
+        .info-item {
+            background: #f0f7ed;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+        
+        .info-value {
+            font-weight: bold;
+            color: var(--primary);
+        }
+        
+        .dss-recommendations {
+            background: #e8f4fd;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .dss-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--secondary);
+            margin-bottom: 10px;
+        }
+        
+        .recommendation-list {
+            list-style: none;
+        }
+        
+        .recommendation-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #d1e9fb;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* Footer */
+        footer {
+            background: #2c3e50;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            font-size: 0.9em;
+        }
+        
+        .system-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #2ecc71;
+        }
+        
+        /* Toggle switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+        
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: var(--primary-light);
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+        
+        /* Legend */
+        .legend {
+            position: absolute;
+            bottom: 150px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+        }
+        
+        .legend-title {
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+        
+        /* Page Content */
+        .page-content {
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .page {
+            display: none;
+        }
+        
+        .page.active {
+            display: block;
+        }
+        
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .dashboard-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .dashboard-card h3 {
+            margin-bottom: 15px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* Charts */
+        .chart-container {
+            height: 300px;
+            width: 100%;
+            margin-top: 15px;
+        }
+        
+        /* Activity List */
+        .activity-list {
+            list-style: none;
+        }
+        
+        .activity-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-text {
+            margin-bottom: 5px;
+        }
+        
+        .activity-time {
+            font-size: 0.8em;
+            color: #888;
+        }
+        
+        /* Buttons */
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: var(--secondary);
+            color: white;
+        }
+        
+        .btn-accent {
+            background: var(--accent);
+            color: white;
+        }
+        
+        /* Forms */
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+        
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        /* Data table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .data-table th, .data-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .data-table th {
+            background-color: #f0f7ed;
+            color: var(--primary);
+        }
+        
+        .data-table tr:hover {
+            background-color: #f9f9f9;
+        }
+        
+        /* Status Badges */
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+        
+        .status-approved {
+            background: #e7f4e4;
+            color: #2c5c1f;
+        }
+        
+        .status-pending {
+            background: #fef5e7;
+            color: #e67e22;
+        }
+        
+        .status-rejected {
+            background: #fae5e5;
+            color: #c0392b;
+        }
+        
+        /* Action buttons */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.8em;
+        }
+        
+        /* Mobile menu */
+        .mobile-menu-btn {
+            display: none;
+            color: white;
+            font-size: 1.5em;
+            cursor: pointer;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 250px 1fr;
+            }
+            
+            .map-overlay {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .sidebar {
+                display: none;
+                position: fixed;
+                z-index: 1500;
+                height: calc(100% - var(--header-height));
+                width: 80%;
+                max-width: 350px;
+                top: var(--header-height);
+                left: 0;
+            }
+            
+            .sidebar.active {
+                display: flex;
+            }
+            
+            .map-overlay {
+                bottom: 10px;
+                left: 10px;
+                right: 10px;
+            }
+            
+            nav ul {
+                display: none;
+                position: absolute;
+                top: var(--header-height);
+                left: 0;
+                right: 0;
+                background: var(--primary);
+                flex-direction: column;
+                padding: 20px;
+            }
+            
+            nav ul.active {
+                display: flex;
+            }
+            
+            .mobile-menu-btn {
+                display: block;
+            }
+            
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Login Screen */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            padding: 20px;
+        }
+        
+        .login-form {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 400px;
+        }
+        
+        .login-form h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+        
+        /* Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen (initially visible) -->
+    <div id="login-screen" class="login-container">
+        <div class="login-form">
+            <h2><i class="fas fa-lock"></i> FRA Atlas Login</h2>
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="Enter your username">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Enter your password">
+            </div>
+            <div class="form-group">
+                <label for="role">Login as</label>
+                <select id="role">
+                    <option value="admin">Administrator</option>
+                    <option value="official">Government Official</option>
+                    <option value="ngo">NGO Representative</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" style="width: 100%;" id="login-btn">Login</button>
+            
+            <div style="margin-top: 20px; text-align: center; font-size: 0.9em; color: #666;">
+                <p>Demo Logins:</p>
+                <p>Admin: admin / admin123</p>
+                <p>Official: official / official123</p>
+                <p>NGO: ngo / ngo123</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Main Application (initially hidden) -->
+    <div id="app-container" class="container" style="display: none;">
+        <header>
+            <div class="logo">
+                <span class="logo-icon">🌳</span>
+                <span>AI-Powered FRA Atlas & DSS</span>
+            </div>
+            <nav>
+                <div class="mobile-menu-btn" id="mobile-menu-btn">
+                    <i class="fas fa-bars"></i>
+                </div>
+                <ul id="nav-menu">
+                    <li><a href="#" class="nav-link active" data-page="dashboard"><i class="fas fa-home"></i> Dashboard</a></li>
+                    <li><a href="#" class="nav-link" data-page="fra-overview"><i class="fas fa-layer-group"></i> FRA Overview</a></li>
+                    <li><a href="#" class="nav-link" data-page="asset-mapping"><i class="fas fa-map-marked-alt"></i> Asset Mapping</a></li>
+                    <li><a href="#" class="nav-link" data-page="analytics"><i class="fas fa-chart-line"></i> Analytics</a></li>
+                    <li><a href="#" class="nav-link" data-page="dss"><i class="fas fa-cogs"></i> DSS</a></li>
+                    <li><a href="#" class="nav-link" data-page="claims-management"><i class="fas fa-tasks"></i> Claims</a></li>
+                </ul>
+            </nav>
+            <div class="user-actions">
+                <div class="notification-btn" id="notification-btn">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-count">3</span>
+                </div>
+                <div class="user-btn" id="user-menu-btn">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="user-role-badge" class="status-badge"></span>
+                </div>
+                <button class="btn btn-sm btn-accent" id="logout-btn">Logout</button>
+            </div>
+        </header>
+        
+        <div class="main-content">
+            <div class="sidebar" id="sidebar">
+                <div class="sidebar-section">
+                    <h2 class="section-title"><i class="fas fa-layer-group"></i> Data Layers</h2>
+                    <ul class="layer-list">
+                        <li class="layer-item">
+                            <span class="layer-color" style="background: #2c5c1f;"></span>
+                            <span>IFR Boundaries</span>
+                            <label class="layer-toggle switch">
+                                <input type="checkbox" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </li>
+                        <li class="layer-item">
+                            <span class="layer-color" style="background: #4a8c31;"></span>
+                            <span>CR/CFR Boundaries</span>
+                            <label class="layer-toggle switch">
+                                <input type="checkbox" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </li>
+                        <li class="layer-item">
+                            <span class="layer-color" style="background: #3498db;"></span>
+                            <span>Water Bodies</span>
+                            <label class="layer-toggle switch">
+                                <input type="checkbox" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </li>
+                        <li class="layer-item">
+                            <span class="layer-color" style="background: #e74c3c;"></span>
+                            <span>Pending Claims</span>
+                            <label class="layer-toggle switch">
+                                <input type="checkbox">
+                                <span class="slider"></span>
+                            </label>
+                        </li>
+                        <li class="layer-item">
+                            <span class="layer-color" style="background: #f39c12;"></span>
+                            <span>Agricultural Land</span>
+                            <label class="layer-toggle switch">
+                                <input type="checkbox" checked>
+                                <span class="slider"></span>
+                            </label>
+                        </li>
+                        <li class="layer-item">
+                            <span class="layer-color" style="background: #9b59b6;"></span>
+                            <span>Forest Cover</span>
+                            <label class="layer-toggle switch">
+                                <input type="checkbox">
+                                <span class="slider"></span>
+                            </label>
+                        </li>
+                    </ul>
+                </div>
+                
+                <div class="sidebar-section">
+                    <h2 class="section-title"><i class="fas fa-filter"></i> Filters</h2>
+                    <div class="filter-tags" id="filter-tags">
+                        <!-- Active filters will appear here -->
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="state-select">State</label>
+                        <select id="state-select">
+                            <option value="">All States</option>
+                            <option value="Madhya Pradesh">Madhya Pradesh</option>
+                            <option value="Tripura">Tripura</option>
+                            <option value="Odisha" selected>Odisha</option>
+                            <option value="Telangana">Telangana</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="district-select">District</label>
+                        <select id="district-select">
+                            <option value="">All Districts</option>
+                            <option value="Koraput">Koraput</option>
+                            <option value="Nabarangpur">Nabarangpur</option>
+                            <option value="Nuapada" selected>Nuapada</option>
+                            <option value="Kalahandi">Kalahandi</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="tribe-select">Tribe</label>
+                        <select id="tribe-select">
+                            <option value="">All Tribes</option>
+                            <option value="Gond">Gond</option>
+                            <option value="Santhal">Santhal</option>
+                            <option value="Bhil">Bhil</option>
+                            <option value="Kandha" selected>Kandha</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="date-range">Time Range</label>
+                        <select id="date-range">
+                            <option value="30">Last 30 Days</option>
+                            <option value="90">Last 90 Days</option>
+                            <option value="ytd" selected>Year to Date</option>
+                            <option value="ly">Last Year</option>
+                            <option value="all">All Time</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="status-select">Claim Status</label>
+                        <select id="status-select">
+                            <option value="">All Statuses</option>
+                            <option value="approved">Approved</option>
+                            <option value="pending">Pending</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+                    
+                    <button class="btn btn-primary" id="apply-filters" style="width: 100%;">Apply Filters</button>
+                    <button class="btn btn-secondary" id="clear-filters" style="width: 100%; margin-top: 10px;">Clear Filters</button>
+                </div>
+                
+                <div class="sidebar-section">
+                    <h2 class="section-title"><i class="fas fa-chart-pie"></i> Statistics</h2>
+                    <div class="stats-cards">
+                        <div class="stat-card">
+                            <div class="stat-value">12,456</div>
+                            <div class="stat-label">Total Patta Grants</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">3,450</div>
+                            <div class="stat-label">Claims Pending</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">10,211</div>
+                            <div class="stat-label">IFR Grants</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value">1,045</div>
+                            <div class="stat-label">CFR Grants</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <h2 class="section-title"><i class="fas fa-history"></i> Recent Activities</h2>
+                    <div class="activity-list" id="recent-activities">
+                        <div class="activity-item">
+                            <div class="activity-text">25 new IFR claims approved in Koraput</div>
+                            <div class="activity-time">2 hours ago</div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-text">CFR boundary updated for Podapadar village</div>
+                            <div class="activity-time">Yesterday</div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-text">Water body mapping completed for Nuapada district</div>
+                            <div class="activity-time">2 days ago</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Page Content Areas -->
+            <div class="page-content">
+                <!-- Dashboard Page -->
+                <div id="dashboard" class="page active">
+                    <div class="dashboard-grid">
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-map-marked-alt"></i> FRA Coverage Overview</h3>
+                            <div class="chart-container">
+                                <canvas id="coverage-chart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-tasks"></i> Recent Activities</h3>
+                            <div class="activity-list">
+                                <div class="activity-item">
+                                    <div class="activity-text">Podapadar village CFR claim approved</div>
+                                    <div class="activity-time">Today, 10:30 AM</div>
+                                </div>
+                                <div class="activity-item">
+                                    <div class="activity-text">25 IFR claims processed in Nuapada district</div>
+                                    <div class="activity-time">Yesterday, 3:45 PM</div>
+                                </div>
+                                <div class="activity-item">
+                                    <div class="activity-text">New water conservation project approved for Boden village</div>
+                                    <div class="activity-time">2 days ago</div>
+                                </div>
+                                <div class="activity-item">
+                                    <div class="activity-text">System update completed successfully</div>
+                                    <div class="activity-time">3 days ago</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-exclamation-circle"></i> Priority Actions</h3>
+                            <div class="activity-list">
+                                <div class="activity-item">
+                                    <div class="activity-text">12 CFR claims awaiting review in Koraput district</div>
+                                    <div class="activity-time">Status: <span class="status-badge status-pending">Urgent</span></div>
+                                </div>
+                                <div class="activity-item">
+                                    <div class="activity-text">Boundary dispute reported in Khalpadar village</div>
+                                    <div class="activity-time">Status: <span class="status-badge status-rejected">Attention Needed</span></div>
+                                </div>
+                                <div class="activity-item">
+                                    <div class="activity-text">Quarterly report due in 5 days</div>
+                                    <div class="activity-time">Status: <span class="status-badge status-pending">Pending</span></div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-chart-bar"></i> Claims by District</h3>
+                            <div class="chart-container">
+                                <canvas id="district-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- FRA Overview Page -->
+                <div id="fra-overview" class="page">
+                    <div class="map-container">
+                        <div id="map"></div>
+                        <div class="map-controls">
+                            <div class="control-btn" title="Zoom In" id="zoom-in"><i class="fas fa-plus"></i></div>
+                            <div class="control-btn" title="Zoom Out" id="zoom-out"><i class="fas fa-minus"></i></div>
+                            <div class="control-btn" title="Current Location" id="current-location"><i class="fas fa-crosshairs"></i></div>
+                            <div class="control-btn" title="Print Map" id="print-map"><i class="fas fa-print"></i></div>
+                        </div>
+                        <div class="legend">
+                            <div class="legend-title">Map Legend</div>
+                            <div class="legend-item">
+                                <span class="legend-color" style="background: #2c5c1f;"></span>
+                                <span>IFR Boundaries</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-color" style="background: #4a8c31;"></span>
+                                <span>CR/CFR Boundaries</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-color" style="background: #3498db;"></span>
+                                <span>Water Bodies</span>
+                            </div>
+                            <div class="legend-item">
+                                <span class="legend-color" style="background: #e74c3c;"></span>
+                                <span>Pending Claims</span>
+                            </div>
+                        </div>
+                        <div class="map-overlay">
+                            <div class="search-container">
+                                <div class="search-box">
+                                    <input type="text" id="search-input" placeholder="Search for village or location...">
+                                    <button id="search-btn"><i class="fas fa-search"></i></button>
+                                </div>
+                                <div class="search-results" id="search-results"></div>
+                                <div class="village-info">
+                                    <h3><i class="fas fa-info-circle"></i> Podapadar Village</h3>
+                                    <div class="info-grid">
+                                        <div class="info-item">
+                                            <div class="info-label">District:</div>
+                                            <div class="info-value">Nuapada</div>
+                                        </div>
+                                        <div class="info-item">
+                                            <div class="info-label">State:</div>
+                                            <div class="info-value">Odisha</div>
+                                        </div>
+                                        <div class="info-item">
+                                            <div class="info-label">Tribe:</div>
+                                            <div class="info-value">Kandha</div>
+                                        </div>
+                                        <div class="info-item">
+                                            <div class="info-label">Population:</div>
+                                            <div class="info-value">427</div>
+                                        </div>
+                                        <div class="info-item">
+                                            <div class="info-label">IFR Claims:</div>
+                                            <div class="info-value">24</div>
+                                        </div>
+                                        <div class="info-item">
+                                            <div class="info-label">CFR Claims:</div>
+                                            <div class="info-value">1</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="dss-recommendations">
+                                <h3 class="dss-title"><i class="fas fa-lightbulb"></i> DSS Recommendations</h3>
+                                <ul class="recommendation-list">
+                                    <li class="recommendation-item">
+                                        <i class="fas fa-seedling"></i>
+                                        <span>Promote bamboo cultivation in community forest area</span>
+                                    </li>
+                                    <li class="recommendation-item">
+                                        <i class="fas fa-tint"></i>
+                                        <span>Develop water conservation measures in hilly terrain</span>
+                                    </li>
+                                    <li class="recommendation-item">
+                                        <i class="fas fa-hand-holding-usd"></i>
+                                        <span>Initiate NTFP value addition training program</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Asset Mapping Page -->
+                <div id="asset-mapping" class="page">
+                    <div class="dashboard-card">
+                        <h3><i class="fas fa-map-marked-alt"></i> Asset Mapping</h3>
+                        <p>Interactive mapping of forest resources, land parcels, and community assets.</p>
+                        <div class="map-container" style="height: 500px;">
+                            <div id="asset-map"></div   ></div>
+                        <div class="map-controls">
+                            <div class="control-btn" title="Zoom In"><i class="fas fa-plus"></i></div>
+                            <div class="control-btn" title="Zoom Out"><i class="fas fa-minus"></i></div>
+                            <div class="control-btn" title="Current Location"><i class="fas fa-crosshairs"></i></div>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-grid" style="margin-top: 20px;">
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-list"></i> Asset Categories</h3>
+                            <ul class="layer-list">
+                                <li class="layer-item">
+                                    <span class="layer-color" style="background: #2c5c1f;"></span>
+                                    <span>Forest Resources</span>
+                                    <label class="layer-toggle switch">
+                                        <input type="checkbox" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </li>
+                                <li class="layer-item">
+                                    <span class="layer-color" style="background: #4a8c31;"></span>
+                                    <span>Water Resources</span>
+                                    <label class="layer-toggle switch">
+                                        <input type="checkbox" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </li>
+                                <li class="layer-item">
+                                    <span class="layer-color" style="background: #3498db;"></span>
+                                    <span>Agricultural Land</span>
+                                    <label class="layer-toggle switch">
+                                        <input type="checkbox" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </li>
+                                <li class="layer-item">
+                                    <span class="layer-color" style="background: #e74c3c;"></span>
+                                    <span>Infrastructure</span>
+                                    <label class="layer-toggle switch">
+                                        <input type="checkbox">
+                                        <span class="slider"></span>
+                                    </label>
+                                </li>
+                            </ul>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-chart-bar"></i> Resource Distribution</h3>
+                            <div class="chart-container">
+                                <canvas id="resource-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Analytics Page -->
+                <div id="analytics" class="page">
+                    <div class="dashboard-card">
+                        <h3><i class="fas fa-chart-line"></i> FRA Analytics Dashboard</h3>
+                        <p>Comprehensive analytics and insights on FRA implementation and impact.</p>
+                        
+                        <div class="filter-group" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                            <select id="analytics-state">
+                                <option value="">All States</option>
+                                <option value="odisha" selected>Odisha</option>
+                                <option value="mp">Madhya Pradesh</option>
+                                <option value="tg">Telangana</option>
+                            </select>
+                            <select id="analytics-year">
+                                <option value="2023">2023</option>
+                                <option value="2022">2022</option>
+                                <option value="2021">2021</option>
+                            </select>
+                            <button class="btn btn-primary">Apply</button>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-grid">
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-chart-pie"></i> Claim Status Distribution</h3>
+                            <div class="chart-container">
+                                <canvas id="status-chart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-chart-bar"></i> Monthly Claims Processed</h3>
+                            <div class="chart-container">
+                                <canvas id="monthly-chart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-users"></i> Tribe-wise Distribution</h3>
+                            <div class="chart-container">
+                                <canvas id="tribe-chart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-map"></i> Regional Performance</h3>
+                            <div class="chart-container">
+                                <canvas id="regional-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-card" style="margin-top: 20px;">
+                        <h3><i class="fas fa-table"></i> Detailed Statistics</h3>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>District</th>
+                                    <th>Total Claims</th>
+                                    <th>Approved</th>
+                                    <th>Pending</th>
+                                    <th>Rejected</th>
+                                    <th>Approval Rate</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Nuapada</td>
+                                    <td>1,245</td>
+                                    <td>895</td>
+                                    <td>250</td>
+                                    <td>100</td>
+                                    <td>71.9%</td>
+                                </tr>
+                                <tr>
+                                    <td>Koraput</td>
+                                    <td>2,340</td>
+                                    <td>1,800</td>
+                                    <td>400</td>
+                                    <td>140</td>
+                                    <td>76.9%</td>
+                                </tr>
+                                <tr>
+                                    <td>Nabarangpur</td>
+                                    <td>1,876</td>
+                                    <td>1,450</td>
+                                    <td>300</td>
+                                    <td>126</td>
+                                    <td>77.3%</td>
+                                </tr>
+                                <tr>
+                                    <td>Kalahandi</td>
+                                    <td>1,654</td>
+                                    <td>1,200</td>
+                                    <td>350</td>
+                                    <td>104</td>
+                                    <td>72.6%</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- DSS Page -->
+                <div id="dss" class="page">
+                    <div class="dashboard-card">
+                        <h3><i class="fas fa-cogs"></i> Decision Support System</h3>
+                        <p>AI-powered recommendations for FRA implementation and resource management.</p>
+                    </div>
+                    
+                    <div class="dashboard-grid">
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-lightbulb"></i> Recommendations</h3>
+                            <div class="activity-list">
+                                <div class="activity-item">
+                                    <div class="activity-text"><strong>Podapadar Village:</strong> Implement water conservation measures</div>
+                                    <div class="activity-time">Priority: <span class="status-badge status-pending">High</span></div>
+                                    <button class="btn btn-sm btn-primary">View Details</button>
+                                </div>
+                                <div class="activity-item">
+                                    <div class="activity-text"><strong>Khalpadar Region:</strong> Boundary dispute resolution needed</div>
+                                    <div class="activity-time">Priority: <span class="status-badge status-rejected">Critical</span></div>
+                                    <button class="btn btn-sm btn-primary">View Details</button>
+                                </div>
+                                <div class="activity-item">
+                                    <div class="activity-text"><strong>Nuapada District:</strong> NTFP value addition program recommended</div>
+                                    <div class="activity-time">Priority: <span class="status-badge status-approved">Medium</span></div>
+                                    <button class="btn btn-sm btn-primary">View Details</button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-project-diagram"></i> Impact Analysis</h3>
+                            <div class="chart-container">
+                                <canvas id="impact-chart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-calculator"></i> Resource Allocation</h3>
+                            <div class="chart-container">
+                                <canvas id="allocation-chart"></canvas>
+                            </div>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-check-circle"></i> Intervention Success Rate</h3>
+                            <div class="chart-container">
+                                <canvas id="success-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-card" style="margin-top: 20px;">
+                        <h3><i class="fas fa-list-alt"></i> Generate DSS Report</h3>
+                        <div class="form-group">
+                            <label for="report-type">Report Type</label>
+                            <select id="report-type">
+                                <option value="resource">Resource Allocation</option>
+                                <option value="intervention">Intervention Planning</option>
+                                <option value="impact">Impact Assessment</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="report-region">Region</label>
+                            <select id="report-region">
+                                <option value="state">State Level</option>
+                                <option value="district">District Level</option>
+                                <option value="village">Village Level</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary">Generate Report</button>
+                    </div>
+                </div>
+                
+                <!-- Claims Management Page -->
+                <div id="claims-management" class="page">
+                    <div class="dashboard-card">
+                        <h3><i class="fas fa-tasks"></i> Claims Management</h3>
+                        <p>Review and process individual and community forest rights claims.</p>
+                        
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                            <div class="filter-group" style="display: flex; gap: 10px;">
+                                <select id="claims-filter">
+                                    <option value="all">All Claims</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="rejected">Rejected</option>
+                                </select>
+                                <button class="btn btn-primary">Filter</button>
+                            </div>
+                            <button class="btn btn-secondary"><i class="fas fa-download"></i> Export Data</button>
+                        </div>
+                    </div>
+                    
+                    <div class="dashboard-card">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Claim ID</th>
+                                    <th>Village</th>
+                                    <th>District</th>
+                                    <th>Type</th>
+                                    <th>Submitted</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>FRA-2023-00125</td>
+                                    <td>Podapadar</td>
+                                    <td>Nuapada</td>
+                                    <td>IFR</td>
+                                    <td>12/08/2023</td>
+                                    <td><span class="status-badge status-approved">Approved</span></td>
+                                    <td class="action-buttons">
+                                        <button class="btn btn-sm btn-primary">View</button>
+                                        <button class="btn btn-sm btn-secondary">Edit</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>FRA-2023-00342</td>
+                                    <td>Boden</td>
+                                    <td>Nuapada</td>
+                                    <td>CFR</td>
+                                    <td>05/09/2023</td>
+                                    <td><span class="status-badge status-pending">Pending</span></td>
+                                    <td class="action-buttons">
+                                        <button class="btn btn-sm btn-primary">View</button>
+                                        <button class="btn btn-sm btn-secondary">Edit</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>FRA-2023-00218</td>
+                                    <td>Khalpadar</td>
+                                    <td>Koraput</td>
+                                    <td>IFR</td>
+                                    <td>28/07/2023</td>
+                                    <td><span class="status-badge status-rejected">Rejected</span></td>
+                                    <td class="action-buttons">
+                                        <button class="btn btn-sm btn-primary">View</button>
+                                        <button class="btn btn-sm btn-secondary">Edit</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>FRA-2023-00467</td>
+                                    <td>Jamguda</td>
+                                    <td>Nabarangpur</td>
+                                    <td>IFR</td>
+                                    <td>15/09/2023</td>
+                                    <td><span class="status-badge status-pending">Pending</span></td>
+                                    <td class="action-buttons">
+                                        <button class="btn btn-sm btn-primary">View</button>
+                                        <button class="btn btn-sm btn-secondary">Edit</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="dashboard-grid" style="margin-top: 20px;">
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-plus-circle"></i> Add New Claim</h3>
+                            <div class="form-group">
+                                <label for="claim-type">Claim Type</label>
+                                <select id="claim-type">
+                                    <option value="ifr">Individual Forest Rights (IFR)</option>
+                                    <option value="cfr">Community Forest Rights (CFR)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="claim-village">Village</label>
+                                <input type="text" id="claim-village" placeholder="Enter village name">
+                            </div>
+                            <div class="form-group">
+                                <label for="claim-document">Upload Documents</label>
+                                <input type="file" id="claim-document">
+                            </div>
+                            <button class="btn btn-primary">Submit Claim</button>
+                        </div>
+                        
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-chart-pie"></i> Claims Status</h3>
+                            <div class="chart-container">
+                                <canvas id="claims-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer>
+            <div class="system-status">
+                <span class="status-indicator"></span>
+                <span>System Status: Operational</span>
+            </div>
+            <div class="copyright">
+                &copy; 2023 AI-Powered FRA Atlas & DSS | Version 2.1.0
+            </div>
+            <div class="footer-links">
+                <a href="#">Help</a> | <a href="#">Privacy</a> | <a href="#">Terms</a>
+            </div>
+        </footer>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        // Login functionality
+        document.getElementById('login-btn').addEventListener('click', function() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const role = document.getElementById('role').value;
+            
+            // Simple validation (in a real app, this would be more secure)
+            if ((username === 'admin' && password === 'admin123') ||
+                (username === 'official' && password === 'official123') ||
+                (username === 'ngo' && password === 'ngo123')) {
+                
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('app-container').style.display = 'grid';
+                
+                // Set user role badge
+                document.getElementById('user-role-badge').textContent = role.charAt(0).toUpperCase() + role.slice(1);
+                
+                // Initialize map
+                initMap();
+                
+                // Initialize charts
+                initCharts();
+            } else {
+                alert('Invalid credentials. Please use one of the demo logins.');
+            }
+        });
+        
+        // Logout functionality
+        document.getElementById('logout-btn').addEventListener('click', function() {
+            document.getElementById('login-screen').style.display = 'flex';
+            document.getElementById('app-container').style.display = 'none';
+        });
+        
+        // Navigation
+        document.querySelectorAll('.nav-link').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Remove active class from all links
+                document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+                
+                // Add active class to clicked link
+                this.classList.add('active');
+                
+                // Hide all pages
+                document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
+                
+                // Show the selected page
+                const pageId = this.getAttribute('data-page');
+                document.getElementById(pageId).classList.add('active');
+            });
+        });
+        
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-btn').addEventListener('click', function() {
+            document.getElementById('nav-menu').classList.toggle('active');
+        });
+        
+        // Initialize map
+        function initMap() {
+            // Initialize the main map
+            const map = L.map('map').setView([20.3, 82.6], 9); // Center on Odisha
+            
+            // Add base layer
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+            
+            // Add some sample markers (in a real app, these would be actual data points)
+            L.marker([20.3, 82.6]).addTo(map)
+                .bindPopup('Podapadar Village<br>IFR Claims: 24<br>CFR Claims: 1')
+                .openPopup();
+                
+            L.marker([20.2, 82.5]).addTo(map)
+                .bindPopup('Boden Village<br>IFR Claims: 18<br>CFR Claims: 1');
+                
+            L.marker([20.4, 82.7]).addTo(map)
+                .bindPopup('Khalpadar Village<br>IFR Claims: 32<br>CFR Claims: 0');
+            
+            // Initialize asset map
+            const assetMap = L.map('asset-map').setView([20.3, 82.6], 9);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(assetMap);
+        }
+        
+        // Initialize charts
+        function initCharts() {
+            // Coverage chart
+            const coverageCtx = document.getElementById('coverage-chart').getContext('2d');
+            new Chart(coverageCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['IFR Grants', 'CFR Grants', 'Pending Claims', 'Rejected Claims'],
+                    datasets: [{
+                        data: [10211, 1045, 3450, 1210],
+                        backgroundColor: ['#2c5c1f', '#4a8c31', '#f39c12', '#e74c3c']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false
+                }
+            });
+            
+            // District chart
+            const districtCtx = document.getElementById('district-chart').getContext('2d');
+            new Chart(districtCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['Nuapada', 'Koraput', 'Nabarangpur', 'Kalahandi'],
+                    datasets: [{
+                        label: 'Approved Claims',
+                        data: [1245, 2340, 1876, 1654],
+                        backgroundColor: '#2c5c1f'
+                    }, {
+                        label: 'Pending Claims',
+                        data: [250, 400, 300, 350],
+                        backgroundColor: '#f39c12'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+            
+            // Initialize other charts similarly...
+        }
+        
+        // Toggle sidebar on mobile
+        document.getElementById('sidebar-toggle').addEventListener('click', function() {
+            document.getElementById('sidebar').classList.toggle('active');
+        });
+        
+        // Apply filters
+        document.getElementById('apply-filters').addEventListener('click', function() {
+            alert('Filters applied! (This would refresh the map and data in a real application)');
+        });
+        
+        // Clear filters
+        document.getElementById('clear-filters').addEventListener('click', function() {
+            document.getElementById('state-select').value = '';
+            document.getElementById('district-select').value = '';
+            document.getElementById('tribe-select').value = '';
+            document.getElementById('date-range').value = 'ytd';
+            document.getElementById('status-select').value = '';
+            
+            alert('Filters cleared! (This would refresh the map and data in a real application)');
+        });
+    </script>
+</body>
+</html>

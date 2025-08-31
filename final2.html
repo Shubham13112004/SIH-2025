@@ -1,0 +1,2634 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI-Powered FRA Atlas & DSS</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* Base Styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        :root {
+            --primary: #2c5c1f;
+            --primary-light: #4a8c31;
+            --secondary: #3498db;
+            --accent: #e74c3c;
+            --warning: #f39c12;
+            --light-bg: #f5f7f9;
+            --dark-text: #333;
+            --light-text: #fff;
+            --sidebar-width: 320px;
+            --header-height: 70px;
+            --footer-height: 40px;
+        }
+
+        body {
+            background-color: var(--light-bg);
+            color: var(--dark-text);
+            overflow-x: hidden;
+        }
+
+        .container {
+            display: grid;
+            grid-template-rows: var(--header-height) 1fr var(--footer-height);
+            min-height: 100vh;
+        }
+
+        /* Header Styles */
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: var(--light-text);
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: bold;
+            font-size: 1.2em;
+        }
+
+        .logo-icon {
+            font-size: 1.5em;
+        }
+
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 20px;
+        }
+
+        nav a {
+            color: var(--light-text);
+            text-decoration: none;
+            padding: 5px 10px;
+            border-radius: 4px;
+            transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        nav a:hover,
+        nav a.active {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .user-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            position: relative;
+        }
+
+        .notification-btn,
+        .user-btn {
+            color: var(--light-text);
+            font-size: 1.2em;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .notification-count {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background-color: var(--accent);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 0.7em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .dropdown {
+            position: absolute;
+            top: 60px;
+            right: 0;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            min-width: 250px;
+            display: none;
+            padding: 10px;
+        }
+
+        .dropdown.active {
+            display: block;
+        }
+
+        .dropdown-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .dropdown-item:hover {
+            background: #f0f7ed;
+        }
+
+        .dropdown-header {
+            padding: 10px;
+            font-weight: bold;
+            color: var(--primary);
+            border-bottom: 2px solid var(--primary-light);
+            margin-bottom: 10px;
+        }
+
+
+        /* Main Content */
+        .main-content {
+            display: grid;
+            grid-template-columns: var(--sidebar-width) 1fr;
+            overflow: hidden;
+        }
+
+        /* Sidebar Styles */
+        .sidebar {
+            background: white;
+            padding: 20px;
+            overflow-y: auto;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .sidebar-section {
+            background: var(--light-bg);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--primary-light);
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .filter-group {
+            margin-bottom: 15px;
+        }
+
+        .filter-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        select,
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+        }
+
+        .layer-list {
+            list-style: none;
+        }
+
+        .layer-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .layer-item:hover {
+            background: #f0f7ed;
+        }
+
+        .layer-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+
+        .layer-toggle {
+            margin-left: auto;
+        }
+
+        .filter-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+
+        .stats-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .stat-card {
+            background: #f0f7ed;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 3px solid var(--primary-light);
+        }
+
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.8em;
+            color: #666;
+        }
+
+        /* Map Container */
+        .map-container {
+            position: relative;
+            overflow: hidden;
+            height: 100%;
+            min-height: 500px;
+        }
+
+        #map,
+        #asset-map {
+            height: 100%;
+            width: 100%;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 1000;
+        }
+
+        .control-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.2em;
+            color: var(--primary);
+        }
+
+        .map-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+        }
+
+        .map-overlay {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .map-overlay.active {
+            display: grid;
+        }
+
+        .map-overlay.hidden {
+            display: none;
+        }
+
+        .search-box {
+            display: flex;
+            margin-bottom: 15px;
+        }
+
+        .search-box input {
+            flex: 1;
+            margin-top: 0;
+            border-right: none;
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+
+        .search-box button {
+            background: var(--primary-light);
+            color: white;
+            border: none;
+            border-top-right-radius: 4px;
+            border-bottom-right-radius: 4px;
+            padding: 0 15px;
+            cursor: pointer;
+        }
+
+        .village-info h3 {
+            margin-bottom: 10px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .info-item {
+            background: #f0f7ed;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 0.9em;
+        }
+
+        .info-value {
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .dss-recommendations {
+            background: #e8f4fd;
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        .dss-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--secondary);
+            margin-bottom: 10px;
+        }
+
+        .recommendation-list {
+            list-style: none;
+        }
+
+        .recommendation-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #d1e9fb;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Footer */
+        footer {
+            background: #2c3e50;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            font-size: 0.9em;
+        }
+
+        .system-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #2ecc71;
+        }
+
+        /* Toggle switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 20px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider {
+            background-color: var(--primary-light);
+        }
+
+        input:checked+.slider:before {
+            transform: translateX(20px);
+        }
+
+        /* Legend */
+        .legend {
+            position: absolute;
+            bottom: 150px;
+            right: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+        }
+
+        .legend-title {
+            margin-bottom: 10px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 5px;
+        }
+
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+        }
+
+        /* Page Content */
+        .page-content {
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .dashboard-card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .dashboard-card h3 {
+            margin-bottom: 15px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        /* Charts */
+        .chart-container {
+            height: 300px;
+            width: 100%;
+            margin-top: 15px;
+        }
+
+        /* Activity List */
+        .activity-list {
+            list-style: none;
+        }
+
+        .activity-item {
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+
+        .activity-text {
+            margin-bottom: 5px;
+        }
+
+        .activity-time {
+            font-size: 0.8em;
+            color: #888;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: var(--secondary);
+            color: white;
+        }
+
+        .btn-accent {
+            background: var(--accent);
+            color: white;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        /* Data table */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .data-table th {
+            background-color: #f0f7ed;
+            color: var(--primary);
+        }
+
+        .data-table tr:hover {
+            background-color: #f9f9f9;
+        }
+
+        /* Status Badges */
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8em;
+            font-weight: 500;
+        }
+
+        .status-approved {
+            background: #e7f4e4;
+            color: #2c5c1f;
+        }
+
+        .status-pending {
+            background: #fef5e7;
+            color: #e67e22;
+        }
+
+        .status-rejected {
+            background: #fae5e5;
+            color: #c0392b;
+        }
+
+        /* Action buttons */
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 0.8em;
+        }
+
+        /* Mobile menu */
+        .mobile-menu-btn {
+            display: none;
+            color: white;
+            font-size: 1.5em;
+            cursor: pointer;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 1024px) {
+            .main-content {
+                grid-template-columns: 250px 1fr;
+            }
+
+            .map-overlay {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                display: none;
+                position: fixed;
+                z-index: 1500;
+                height: calc(100% - var(--header-height));
+                width: 80%;
+                max-width: 350px;
+                top: var(--header-height);
+                left: 0;
+            }
+
+            .sidebar.active {
+                display: flex;
+            }
+
+            .map-overlay {
+                bottom: 10px;
+                left: 10px;
+                right: 10px;
+            }
+
+            nav ul {
+                display: none;
+                position: absolute;
+                top: var(--header-height);
+                left: 0;
+                right: 0;
+                background: var(--primary);
+                flex-direction: column;
+                padding: 20px;
+            }
+
+            nav ul.active {
+                display: flex;
+            }
+
+            .mobile-menu-btn {
+                display: block;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .stats-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Login Screen */
+        .login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            padding: 20px;
+        }
+
+        .login-form {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .login-form h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        /* Animation */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        /* Modal for Claims */
+        .modal {
+            display: none;
+            /* Hidden by default */
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0, 0, 0, 0.4);
+            animation: fadeIn 0.3s;
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 10% auto;
+            padding: 25px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 600px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+
+        .close-btn {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close-btn:hover,
+        .close-btn:focus {
+            color: #000;
+            text-decoration: none;
+        }
+
+        .claims-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .print-btn-container {
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: flex-end;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Login Screen (initially visible) -->
+    <div id="login-screen" class="login-container">
+        <div class="login-form">
+            <h2><i class="fas fa-lock"></i> FRA Atlas Login</h2>
+            <div id="login-message" style="color: var(--accent); text-align: center; margin-bottom: 10px;"></div>
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" placeholder="Enter your username">
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Enter your password">
+            </div>
+            <div class="form-group">
+                <label for="role">Login as</label>
+                <select id="role">
+                    <option value="admin">Administrator</option>
+                    <option value="official">Government Official</option>
+                    <option value="ngo">NGO Representative</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" style="width: 100%;" id="login-btn">Login</button>
+
+            <div style="margin-top: 20px; text-align: center; font-size: 0.9em; color: #666;">
+                <p>Demo Logins:</p>
+                <p>Admin: admin / admin123</p>
+                <p>Official: official / official123</p>
+                <p>NGO: ngo / ngo123</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Application (initially hidden) -->
+    <div id="app-container" class="container" style="display: none;">
+        <header>
+            <div class="logo">
+                <span class="logo-icon">🌳</span>
+                <span>AI-Powered FRA Atlas & DSS</span>
+            </div>
+            <nav>
+                <div class="mobile-menu-btn" id="mobile-menu-btn">
+                    <i class="fas fa-bars"></i>
+                </div>
+                <ul id="nav-menu">
+                    <li><a href="#" class="nav-link active" data-page="dashboard"><i class="fas fa-home"></i> Dashboard</a></li>
+                    <li><a href="#" class="nav-link" data-page="fra-overview"><i class="fas fa-layer-group"></i> FRA Overview</a></li>
+                    <li><a href="#" class="nav-link" data-page="asset-mapping"><i class="fas fa-map-marked-alt"></i> Asset Mapping</a></li>
+                    <li><a href="#" class="nav-link" data-page="analytics"><i class="fas fa-chart-line"></i> Analytics</a></li>
+                    <li><a href="#" class="nav-link" data-page="dss"><i class="fas fa-cogs"></i> DSS</a></li>
+                    <li><a href="#" class="nav-link" data-page="claims-management"><i class="fas fa-tasks"></i> Claims</a></li>
+                </ul>
+            </nav>
+            <div class="user-actions">
+                <div class="notification-btn" id="notification-btn">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-count" id="notification-count">3</span>
+                </div>
+                <div id="notification-dropdown" class="dropdown">
+                    <div class="dropdown-header">Notifications</div>
+                    <div class="dropdown-item">New claims filed in Nuapada.</div>
+                    <div class="dropdown-item">Quarterly report is due.</div>
+                    <div class="dropdown-item">System update complete.</div>
+                </div>
+
+                <div class="user-btn" id="user-menu-btn">
+                    <i class="fas fa-user-circle"></i>
+                    <span id="user-role-badge" class="status-badge"></span>
+                </div>
+                <div id="user-dropdown" class="dropdown" style="right: 50px;">
+                    <div class="dropdown-header" id="user-dropdown-header"></div>
+                    <div class="dropdown-item">Profile</div>
+                    <div class="dropdown-item">Settings</div>
+                    <div class="dropdown-item" id="logout-dropdown-btn">Logout</div>
+                </div>
+
+                <button class="btn btn-sm btn-accent" id="logout-btn">Logout</button>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <div class="sidebar" id="sidebar">
+                <div class="sidebar-section">
+                    <h2 class="section-title"><i class="fas fa-layer-group"></i> Data Layers</h2>
+                    <ul class="layer-list" id="layer-list">
+                        <li class="layer-item">
+                            <span class="layer-color" style="background: #2c5c1f;"></span>
+                            <span>IFR Boundaries</span>
+                            <label class="layer-toggle switch">
+                                <input type="checkbox" checked data-layer="ifr">
+                                <span class="slider"></span>
+                            </label>
+                        </li>
+                        <li class="layer-item">
+                            <span class="layer-color" style="background: #4a8c31;"></span>
+                            <span>CR/CFR Boundaries</span>
+                            <label class="layer-toggle switch">
+                                <input type="checkbox" checked data-layer="cfr">
+                                <span class="slider"></span>
+                            </label>
+                        </li>
+                        <li class="layer-item">
+                            <span class="layer-color" style="background: #3498db;"></span>
+                            <span>Water Bodies</span>
+                            <label class="layer-toggle switch">
+                                <input type="checkbox" checked data-layer="water">
+                                <span class="slider"></span>
+                            </label>
+                        </li>
+                        <li class="layer-item">
+                            <span class="layer-color" style="background: #e74c3c;"></span>
+                            <span>Pending Claims</span>
+                            <label class="layer-toggle switch">
+                                <input type="checkbox" data-layer="pending">
+                                <span class="slider"></span>
+                            </label>
+                        </li>
+                        <li class="layer-item">
+                            <span class="layer-color" style="background: #f39c12;"></span>
+                            <span>Agricultural Land</span>
+                            <label class="layer-toggle switch">
+                                <input type="checkbox" checked data-layer="agri">
+                                <span class="slider"></span>
+                            </label>
+                        </li>
+                        <li class="layer-item">
+                            <span class="layer-color" style="background: #9b59b6;"></span>
+                            <span>Forest Cover</span>
+                            <label class="layer-toggle switch">
+                                <input type="checkbox" data-layer="forest">
+                                <span class="slider"></span>
+                            </label>
+                        </li>
+                        <li class="layer-item">
+                            <span class="layer-color" style="background: #808080;"></span>
+                            <span>PM Gati Shakti</span>
+                            <label class="layer-toggle switch">
+                                <input type="checkbox" checked data-layer="gati">
+                                <span class="slider"></span>
+                            </label>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="sidebar-section">
+                    <h2 class="section-title"><i class="fas fa-filter"></i> Filters</h2>
+                    <div class="filter-tags" id="filter-tags">
+                        <!-- Active filters will appear here -->
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="state-select">State</label>
+                        <select id="state-select">
+                            <option value="">All States</option>
+                            <option value="Madhya Pradesh">Madhya Pradesh</option>
+                            <option value="Tripura">Tripura</option>
+                            <option value="Odisha" selected>Odisha</option>
+                            <option value="Telangana">Telangana</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="district-select">District</label>
+                        <select id="district-select">
+                            <option value="">All Districts</option>
+                            <!-- Options populated by JS -->
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="tribe-select">Tribe</label>
+                        <select id="tribe-select">
+                            <option value="">All Tribes</option>
+                            <option value="Gond">Gond</option>
+                            <option value="Santhal">Santhal</option>
+                            <option value="Bhil">Bhil</option>
+                            <option value="Kandha" selected>Kandha</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="date-range">Time Range</label>
+                        <select id="date-range">
+                            <option value="30">Last 30 Days</option>
+                            <option value="90">Last 90 Days</option>
+                            <option value="ytd" selected>Year to Date</option>
+                            <option value="ly">Last Year</option>
+                            <option value="all">All Time</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="status-select">Claim Status</label>
+                        <select id="status-select">
+                            <option value="">All Statuses</option>
+                            <option value="approved">Approved</option>
+                            <option value="pending">Pending</option>
+                            <option value="rejected">Rejected</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-primary" id="apply-filters" style="width: 100%;">Apply Filters</button>
+                    <button class="btn btn-secondary" id="clear-filters" style="width: 100%; margin-top: 10px;">Clear
+                        Filters</button>
+                </div>
+
+                <div class="sidebar-section">
+                    <h2 class="section-title"><i class="fas fa-chart-pie"></i> Statistics</h2>
+                    <div class="stats-cards">
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-patta-grants">12,456</div>
+                            <div class="stat-label">Total Patta Grants</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-claims-pending">3,450</div>
+                            <div class="stat-label">Claims Pending</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-ifr-grants">10,211</div>
+                            <div class="stat-label">IFR Grants</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-value" id="stat-cfr-grants">1,045</div>
+                            <div class="stat-label">CFR Grants</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="sidebar-section">
+                    <h2 class="section-title"><i class="fas fa-history"></i> Recent Activities</h2>
+                    <div class="activity-list" id="recent-activities">
+                        <div class="activity-item">
+                            <div class="activity-text">25 new IFR claims approved in Koraput</div>
+                            <div class="activity-time">2 hours ago</div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-text">CFR boundary updated for Podapadar village</div>
+                            <div class="activity-time">Yesterday</div>
+                        </div>
+                        <div class="activity-item">
+                            <div class="activity-text">Water body mapping completed for Nuapada district</div>
+                            <div class="activity-time">2 days ago</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page Content Areas -->
+            <div class="page-content">
+                <!-- Dashboard Page -->
+                <div id="dashboard" class="page active">
+                    <div class="dashboard-grid">
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-map-marked-alt"></i> FRA Coverage Overview</h3>
+                            <div class="chart-container">
+                                <canvas id="coverage-chart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-tasks"></i> Recent Activities</h3>
+                            <div class="activity-list" id="dashboard-activities">
+                                <!-- Activities will be populated here by JS -->
+                            </div>
+                        </div>
+
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-exclamation-circle"></i> Priority Actions</h3>
+                            <div class="activity-list" id="priority-actions">
+                                <!-- Actions will be populated here by JS -->
+                            </div>
+                        </div>
+
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-chart-bar"></i> Claims by District</h3>
+                            <div class="chart-container">
+                                <canvas id="district-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FRA Overview Page -->
+                <div id="fra-overview" class="page">
+                    <div class="print-btn-container">
+                        <button class="btn btn-secondary" id="print-map-fra"><i class="fas fa-print"></i> Print Report</button>
+                    </div>
+                    <div class="map-container">
+                        <div id="map"></div>
+                        <div class="map-controls">
+                            <div class="control-btn" title="Zoom In" id="zoom-in-map"><i class="fas fa-plus"></i></div>
+                            <div class="control-btn" title="Zoom Out" id="zoom-out-map"><i class="fas fa-minus"></i></div>
+                            <div class="control-btn" title="Current Location" id="current-location-map"><i class="fas fa-crosshairs"></i></div>
+                        </div>
+                        <div class="map-info">
+                            <h4>Map Coordinates</h4>
+                            <p id="map-coords">Click on the map to get coordinates</p>
+                        </div>
+                        <div class="legend">
+                            <div class="legend-title">Map Legend</div>
+                            <div class="legend-item"><span class="legend-color" style="background: #2c5c1f;"></span><span>IFR
+                                    Boundaries</span></div>
+                            <div class="legend-item"><span class="legend-color" style="background: #4a8c31;"></span><span>CR/CFR
+                                    Boundaries</span></div>
+                            <div class="legend-item"><span class="legend-color" style="background: #3498db;"></span><span>Water
+                                    Bodies</span></div>
+                            <div class="legend-item"><span class="legend-color" style="background: #e74c3c;"></span><span>Pending
+                                    Claims</span></div>
+                        </div>
+                        <div class="map-overlay" id="fra-map-overlay">
+                            <div class="search-container">
+                                <div class="search-box">
+                                    <input type="text" id="search-input-map" placeholder="Search for village or location...">
+                                    <button id="search-btn-map"><i class="fas fa-search"></i></button>
+                                </div>
+                                <div class="search-results" id="search-results-map"></div>
+                                <div class="village-info" id="village-info-container">
+                                    <h3><i class="fas fa-info-circle"></i> Podapadar Village</h3>
+                                    <div class="info-grid">
+                                        <div class="info-item">
+                                            <div class="info-label">District:</div>
+                                            <div class="info-value">Nuapada</div>
+                                        </div>
+                                        <div class="info-item">
+                                            <div class="info-label">State:</div>
+                                            <div class="info-value">Odisha</div>
+                                        </div>
+                                        <div class="info-item">
+                                            <div class="info-label">Tribe:</div>
+                                            <div class="info-value">Kandha</div>
+                                        </div>
+                                        <div class="info-item">
+                                            <div class="info-label">Population:</div>
+                                            <div class="info-value">427</div>
+                                        </div>
+                                        <div class="info-item">
+                                            <div class="info-label">IFR Claims:</div>
+                                            <div class="info-value">24</div>
+                                        </div>
+                                        <div class="info-item">
+                                            <div class="info-label">CFR Claims:</div>
+                                            <div class="info-value">1</div>
+                                        </div>
+                                    </div>
+                                    <hr style="margin: 10px 0; border-color: #ddd;">
+                                    <div id="groundwater-status" style="text-align: center; font-weight: bold; padding: 10px; border-radius: 6px;">
+                                        Groundwater Index: <span style="font-weight: normal;">High</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="dss-recommendations" id="dss-recommendations-map">
+                                <h3 class="dss-title"><i class="fas fa-lightbulb"></i> DSS Recommendations</h3>
+                                <ul class="recommendation-list">
+                                    <li class="recommendation-item"><i class="fas fa-seedling"></i><span>Promote bamboo cultivation
+                                            in community forest area</span></li>
+                                    <li class="recommendation-item"><i class="fas fa-tint"></i><span>Develop water conservation
+                                            measures in hilly terrain</span></li>
+                                    <li class="recommendation-item"><i class="fas fa-hand-holding-usd"></i><span>Initiate NTFP value
+                                            addition training program</span></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="dashboard-card" style="margin-top: 20px;">
+                        <h3><i class="fas fa-info-circle"></i> About the Forest Rights Act (FRA), 2006</h3>
+                        <p>
+                            The Forest Rights Act (FRA), 2006, is a landmark piece of legislation that recognizes and vests the forest rights and occupation of forest dwelling Scheduled Tribes and other traditional forest dwellers who have been residing in such forests for generations but whose rights could not be recorded. The Act aims to correct a historical injustice against forest-dwelling communities and provides a framework for community-led forest conservation and management.
+                        </p>
+                        <br>
+                        <h4>Key Provisions:</h4>
+                        <ul>
+                            <li><b>Individual Forest Rights (IFR)</b>: Grants rights to land under cultivation for individual tribal families, up to a maximum of four hectares.</li>
+                            <li><b>Community Rights (CR)</b>: Recognizes community rights to access, collect, use, and dispose of minor forest produce.</li>
+                            <li><b>Community Forest Resource Rights (CFR)</b>: Empowers Gram Sabhas (village assemblies) to protect, regenerate, conserve, and manage community forest resources.</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Asset Mapping Page -->
+                <div id="asset-mapping" class="page">
+                    <div class="print-btn-container">
+                        <button class="btn btn-secondary" id="print-map-assets"><i class="fas fa-print"></i> Print Report</button>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3><i class="fas fa-map-marked-alt"></i> Asset Mapping</h3>
+                        <p>Interactive mapping of forest resources, land parcels, and community assets.
+                            <button id="add-asset-btn" class="btn btn-sm btn-primary" style="float: right;"><i
+                                    class="fas fa-plus-circle"></i> Add New Asset</button>
+                        </p>
+                        <div class="search-box">
+                            <input type="text" id="search-input-asset" placeholder="Search for assets...">
+                            <button id="search-btn-asset"><i class="fas fa-search"></i></button>
+                        </div>
+                        <div class="map-container">
+                            <div id="asset-map"></div>
+                        </div>
+
+                        <div class="dashboard-grid" style="margin-top: 20px;">
+                            <div class="dashboard-card">
+                                <h3><i class="fas fa-list"></i> Asset Categories</h3>
+                                <ul class="layer-list" id="asset-layer-list">
+                                    <li class="layer-item">
+                                        <span class="layer-color" style="background: #2c5c1f;"></span>
+                                        <span>Forest Resources</span>
+                                        <label class="layer-toggle switch">
+                                            <input type="checkbox" checked data-layer="assetForest">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </li>
+                                    <li class="layer-item">
+                                        <span class="layer-color" style="background: #4a8c31;"></span>
+                                        <span>Water Resources</span>
+                                        <label class="layer-toggle switch">
+                                            <input type="checkbox" checked data-layer="assetWater">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </li>
+                                    <li class="layer-item">
+                                        <span class="layer-color" style="background: #3498db;"></span>
+                                        <span>Agricultural Land</span>
+                                        <label class="layer-toggle switch">
+                                            <input type="checkbox" checked data-layer="assetAgri">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </li>
+                                    <li class="layer-item">
+                                        <span class="layer-color" style="background: #e74c3c;"></span>
+                                        <span>Infrastructure</span>
+                                        <label class="layer-toggle switch">
+                                            <input type="checkbox" data-layer="assetInfra">
+                                            <span class="slider"></span>
+                                        </label>
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div class="dashboard-card">
+                                <h3><i class="fas fa-chart-bar"></i> Resource Distribution</h3>
+                                <div class="chart-container">
+                                    <canvas id="resource-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Analytics Page -->
+                <div id="analytics" class="page">
+                    <div class="print-btn-container">
+                        <button class="btn btn-secondary" id="print-analytics"><i class="fas fa-print"></i> Print Report</button>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3><i class="fas fa-chart-line"></i> FRA Analytics Dashboard</h3>
+                        <p>Comprehensive analytics and insights on FRA implementation and impact.</p>
+
+                        <div class="filter-group" style="display: flex; gap: 10px; margin-bottom: 20px;">
+                            <select id="analytics-state">
+                                <option value="">All States</option>
+                                <option value="odisha" selected>Odisha</option>
+                                <option value="mp">Madhya Pradesh</option>
+                                <option value="tg">Telangana</option>
+                            </select>
+                            <select id="analytics-year">
+                                <option value="2024" selected>2024</option>
+                                <option value="2023">2023</option>
+                                <option value="2022">2022</option>
+                                <option value="2021">2021</option>
+                            </select>
+                            <button class="btn btn-primary" id="apply-analytics-filters">Apply</button>
+                        </div>
+                    </div>
+
+                    <div class="dashboard-grid">
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-chart-pie"></i> Claim Status Distribution</h3>
+                            <div class="chart-container">
+                                <canvas id="claims-status-chart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-chart-bar"></i> Monthly Claims Processed</h3>
+                            <div class="chart-container">
+                                <canvas id="monthly-chart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-users"></i> Tribe-wise Distribution</h3>
+                            <div class="chart-container">
+                                <canvas id="tribe-chart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="dashboard-card">
+                            <h3><i class="fas fa-map"></i> Regional Performance</h3>
+                            <div class="chart-container">
+                                <canvas id="regional-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- DSS Page -->
+                <div id="dss" class="page">
+                    <div class="print-btn-container">
+                        <button class="btn btn-secondary" id="print-dss"><i class="fas fa-print"></i> Print Report</button>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3><i class="fas fa-cogs"></i> Decision Support System</h3>
+                        <p>AI-powered recommendations for FRA implementation and resource management.</p>
+                        <div class="form-group">
+                            <label for="dss-prompt">Enter your query for AI-powered DSS:</label>
+                            <textarea id="dss-prompt" rows="4" placeholder="e.g., 'What are the best sustainable livelihood options for the tribal communities in the Koraput district?'"></textarea>
+                        </div>
+                        <button class="btn btn-secondary" id="dss-generate-btn"><i class="fas fa-magic"></i> Generate
+                            Recommendations</button>
+                        <div class="dashboard-card" style="margin-top: 20px;">
+                            <h4><i class="fas fa-lightbulb"></i> AI Recommendations</h4>
+                            <div id="dss-output" style="white-space: pre-wrap;">Enter a query above to generate a
+                                recommendation.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Claims Management Page -->
+                <div id="claims-management" class="page">
+                    <div class="print-btn-container">
+                        <button class="btn btn-secondary" id="print-claims"><i class="fas fa-print"></i> Print Report</button>
+                    </div>
+                    <div class="dashboard-card">
+                        <h3><i class="fas fa-tasks"></i> Claims Management</h3>
+                        <p>Review and process individual and community forest rights claims.
+                            <button id="add-claim-btn" class="btn btn-primary btn-sm" style="float: right;"><i
+                                    class="fas fa-plus-circle"></i> Add New Claim</button>
+                        </p>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                            <div class="filter-group" style="display: flex; gap: 10px;">
+                                <select id="claims-filter">
+                                    <option value="all">All Claims</option>
+                                    <option value="pending">Pending</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="rejected">Rejected</option>
+                                </select>
+                            </div>
+                            <button class="btn btn-secondary" id="export-claims"><i class="fas fa-download"></i> Export
+                                Data</button>
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Claim ID</th>
+                                    <th>Village</th>
+                                    <th>Type</th>
+                                    <th>Date Filed</th>
+                                    <th>Status</th>
+                                    <th id="claims-actions-header">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="claims-table-body">
+                                <!-- Claims will be populated here by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <div class="system-status">
+                <span class="status-indicator"></span>
+                <span>System Status: Operational</span>
+            </div>
+            <span>&copy; 2024 AI-Powered FRA Atlas | Version 2.1.0</span>
+        </footer>
+    </div>
+
+    <!-- Modal for adding new claim -->
+    <div id="claim-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-plus-circle"></i> Add New Claim</h2>
+                <span class="close-btn" id="close-claim-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="new-claim-village">Village</label>
+                    <input type="text" id="new-claim-village" placeholder="Village Name" required>
+                </div>
+                <div class="form-group">
+                    <label for="new-claim-type">Claim Type</label>
+                    <select id="new-claim-type" required>
+                        <option value="IFR">IFR (Individual Forest Rights)</option>
+                        <option value="CFR">CFR (Community Forest Rights)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="new-claim-description">Description</label>
+                    <textarea id="new-claim-description" rows="3" placeholder="Provide a brief description of the claim..."></textarea>
+                </div>
+            </div>
+            <div class="claims-actions">
+                <button class="btn btn-primary" id="submit-claim-btn">Submit Claim</button>
+                <button class="btn btn-secondary" id="cancel-claim-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for editing a claim -->
+    <div id="edit-claim-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-edit"></i> Edit Claim</h2>
+                <span class="close-btn" id="close-edit-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="edit-claim-id">Claim ID</label>
+                    <input type="text" id="edit-claim-id" readonly>
+                </div>
+                <div class="form-group">
+                    <label for="edit-claim-village">Village</label>
+                    <input type="text" id="edit-claim-village">
+                </div>
+                <div class="form-group">
+                    <label for="edit-claim-status">Status</label>
+                    <select id="edit-claim-status">
+                        <option value="Pending">Pending</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Rejected">Rejected</option>
+                    </select>
+                </div>
+            </div>
+            <div class="claims-actions">
+                <button class="btn btn-primary" id="save-edit-btn">Save Changes</button>
+                <button class="btn btn-secondary" id="cancel-edit-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Modal for adding new asset -->
+    <div id="add-asset-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-plus-circle"></i> Add New Asset</h2>
+                <span class="close-btn" id="close-add-asset-modal">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="new-asset-name">Asset Name</label>
+                    <input type="text" id="new-asset-name" placeholder="e.g. Community Pond" required>
+                </div>
+                <div class="form-group">
+                    <label for="new-asset-type">Asset Type</label>
+                    <select id="new-asset-type" required>
+                        <option value="Water">Water Resources</option>
+                        <option value="Forest">Forest Resources</option>
+                        <option value="Agricultural">Agricultural Land</option>
+                        <option value="Infrastructure">Infrastructure</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="new-asset-lat">Latitude</label>
+                    <input type="text" id="new-asset-lat" placeholder="e.g. 19.235" required>
+                </div>
+                <div class="form-group">
+                    <label for="new-asset-lng">Longitude</label>
+                    <input type="text" id="new-asset-lng" placeholder="e.g. 82.715" required>
+                </div>
+            </div>
+            <div class="claims-actions">
+                <button class="btn btn-primary" id="submit-asset-btn">Add Asset</button>
+                <button class="btn btn-secondary" id="cancel-asset-btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Custom Message Modal -->
+    <div id="message-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="message-title">Notification</h2>
+                <span class="close-btn" id="close-message-modal">&times;</span>
+            </div>
+            <div class="modal-body" id="message-body"></div>
+            <div class="claims-actions">
+                <button class="btn btn-secondary" id="ok-message-modal">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom Confirmation Modal -->
+    <div id="confirmation-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="confirmation-title">Confirm Action</h2>
+                <span class="close-btn" id="close-confirmation-modal">&times;</span>
+            </div>
+            <div class="modal-body" id="confirmation-body">Are you sure you want to proceed?</div>
+            <div class="claims-actions">
+                <button class="btn btn-accent" id="confirm-yes">Yes</button>
+                <button class="btn btn-secondary" id="confirm-no">No</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginScreen = document.getElementById('login-screen');
+            const appContainer = document.getElementById('app-container');
+            const loginBtn = document.getElementById('login-btn');
+            const logoutBtn = document.getElementById('logout-btn');
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            const roleSelect = document.getElementById('role');
+            const userRoleBadge = document.getElementById('user-role-badge');
+            const navLinks = document.querySelectorAll('.nav-link');
+            const pages = document.querySelectorAll('.page');
+            const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+            const navMenu = document.getElementById('nav-menu');
+            const sidebar = document.getElementById('sidebar');
+            const filterTagsContainer = document.getElementById('filter-tags');
+
+            // Dropdowns
+            const notificationBtn = document.getElementById('notification-btn');
+            const notificationDropdown = document.getElementById('notification-dropdown');
+            const userMenuBtn = document.getElementById('user-menu-btn');
+            const userDropdown = document.getElementById('user-dropdown');
+            const logoutDropdownBtn = document.getElementById('logout-dropdown-btn');
+
+            // Maps
+            let mainMap, assetMap;
+            let currentVillage = null;
+            const villages = [{
+                latlng: [19.2312, 82.7090],
+                name: 'Podapadar',
+                district: 'Nuapada',
+                state: 'Odisha',
+                tribe: 'Kandha',
+                population: 427,
+                ifr: 24,
+                cfr: 1,
+                groundwater: 'High'
+            }, {
+                latlng: [20.7812, 83.2190],
+                name: 'Boden',
+                district: 'Nuapada',
+                state: 'Odisha',
+                tribe: 'Gond',
+                population: 650,
+                ifr: 30,
+                cfr: 2,
+                groundwater: 'Medium'
+            }, {
+                latlng: [19.6480, 83.7140],
+                name: 'Koraput',
+                district: 'Koraput',
+                state: 'Odisha',
+                tribe: 'Bhil',
+                population: 800,
+                ifr: 45,
+                cfr: 3,
+                groundwater: 'Low'
+            }, {
+                latlng: [20.0100, 82.7210],
+                name: 'Lanjigarh',
+                district: 'Kalahandi',
+                state: 'Odisha',
+                tribe: 'Santhal',
+                population: 350,
+                ifr: 15,
+                cfr: 0,
+                groundwater: 'High'
+            }, {
+                latlng: [20.2110, 84.1500],
+                name: 'Sonepur',
+                district: 'Sonepur',
+                state: 'Odisha',
+                tribe: 'Gond',
+                population: 500,
+                ifr: 20,
+                cfr: 5,
+                groundwater: 'High'
+            }, {
+                latlng: [23.1678, 80.3708],
+                name: 'Dindori',
+                district: 'Dindori',
+                state: 'Madhya Pradesh',
+                tribe: 'Gond',
+                population: 1200,
+                ifr: 55,
+                cfr: 10,
+                groundwater: 'High'
+            }];
+
+            let assetLocations = [
+                { latlng: [19.235, 82.715], name: 'Community Pond', type: 'Water', icon: 'fas fa-tint' },
+                { latlng: [19.240, 82.710], name: 'Bamboo Forest', type: 'Forest', icon: 'fas fa-tree' },
+                { latlng: [19.650, 83.710], name: 'Paddy Field', type: 'Agricultural', icon: 'fas fa-seedling' },
+                { latlng: [20.785, 83.220], name: 'School Building', type: 'Infrastructure', icon: 'fas fa-school' }
+            ];
+
+            const assetIcons = {
+                'Water': L.icon({
+                    iconUrl: 'data:image/svg+xml;base64,PHN2ZyBhcmlhLWhpZGRlbj0idHJ1ZSIgZm9jdXNhYmxlPSJmYWxzZSIgZGF0YS1wcmVmaXg9ImZhcyIgZGF0YS1pY29uPSJ0aW50IiBjbGFzcz0ic3ZnLWlubGluZS0tZmEiIHJvbGU9ImltZyIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB2aWV3Qm94PSIwIDAgMzIwIDUxMiI+PHBhdGggZmlsbD0iIzM0OTgZGIiIGQ9Ik0xNjAgNjRjMC04LjgxMi03LjE4OC0xNi0xNi0xNnMtMTYgNy4xODgtMTYgMTZ2NjRjMCA4LjgxMiA3LjE4OCAxNiAxNiAxNnNlMTYtNy4xODggMTYtMTZWMzJ6bTkyIDU2LjE4OGMtOS45NjktMTEuNzItMTUuNzgtMjYuNjItMTUuNzgtNDMuMzAzQzE2MC45NyAwLjA2NTEgMTQzLjAzIDAgMTI4IDBzLTMyLjA0IDAuMDY1MS0zOC4yMiA3Ljg3N2MtOC40NyAxMS4zNC0yMy4zNyAxNy4wOC0zOS4wNiAxNy4wOC0yMi4wNyAwLTQxLjgyLTEwLjI1LTU0LjU2LTI2Ljg4LTM3LjI3IDQ4LjAzLTU5LjE1IDkxLjM0LTU5LjY3IDE5Ni4zMi0uNTI1IDEwNC45OCAxMzMuNiAxOTAuMSAxODEuNSAyNjguOCA4LjMyOCAxNS4xMSAyNy45NSAxNS4xMSAzNi4yOCAwTDMwMC4yIDI4OC40YzE1LjI2LTI0LjkzIDE5LjAyLTQ5LjA3IDIwLjI3LTU3LjE1LS40MzQtLjYxMzMtNS4xNDQtMS4xMjYtNy42NTYtMi4zOTItMi4xNTctLjcyNDgtMy43ODEtMS4wNDQtNi42MjktMS43NjMtMTYuNDQtNC4yMjYtMjcuODMtMTQuNjktMzIuOTktMzEuMzQtMS44MTktNS44NDEtMi40NDQtMTEuODEtMi41NjktMTQuNTEuODQxLTIuMjQ0IDguNDM3LTUuMzc5IDEyLjU2LTcuOTA2QzI3Ny41IDI3Ni43IDMwNCAyNDIuMSAyODYuNCAyMTIuOCAyNjkgMTgzLjUgMjQxLjUgMTc2LjQgMjE4LjkgMTcxLjEgMjEwLjQgMTY3LjggMjAyLjggMTYyLjEgMjAyLjggMTUyLjggMjAyLjggMTM4LjIgMjE0LjEgMTMxLjMgMjQxLjkgMTI0LjQgMjc3LjggMTIwLjQgMjk1LjIgMTE0LjYgMjk1LjIgOTYuMTYgMzA4LjggMzIuNzggNTEuMi0zMi4xNCA0LjItNDYuMiAyMi42OC01OC4xIDU2LjA4LTkuMDkgMTAuMS0xNi41NSAxOS43NS0xNi41NSAzMy43NCAwIDE5LjE0IDE1LjU5IDM0LjcxIDE5LjUzIDQzLjgzeiIvPjwvc3ZnPg==',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34]
+                }),
+                'Forest': L.icon({
+                    iconUrl: 'data:image/svg+xml;base64,PHN2ZyBhcmlhLWhpZGRlbj0idHJ1ZSIgZm9jdXNhYmxlPSJmYWxzZSIgZGF0YS1wcmVmaXg9ImZhcyIgZGF0YS1pY29uPSJ0cmVlIiBjbGFzcz0ic3ZnLWlubGluZS0tZmEiIHJvbGU9ImltZyIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB2aWV3Qm94PSIwIDAgNDQ4IDUxMiI+PHBhdGggZmlsbD0iIzJjNWMxZiIgZD0iTTM1MiAzMjBjLTI5LjYgMC01NS40NiAxMS42NC03NS41MyAzMy42Ny0yMC4xLTMyLjAzLTQ2Ljk0LTQ1LjY1LTYyLjQ1LTUxLjI1LTEyLjY1LTEyLjktMzEuMDItMjEuMjMtNTUuNTItMjEuMjMtMjkuMTYgMC01NC42MiAxNC42My02OC42MiAzNS40OC0xMi40MiAxOS4xNS0xOC40NCA0MS40Ni0yMy45NyA2NS45Mi04LjAyNSA0My42NC01LjYyNSA3OS41IDIuMDI1IDEwNC43IDcuNjUgMjMuOTYgMjQuNDcgNDcuNDEgNDkuNDcgNTkuMzdDMTA0LjcgNDgyLjMgMjE1LjMgNTEyIDIxNS4zIDUxMnMtNTYuOTgtMzAuMTQtMTAyLjQtMTI3LjVjLTM3LjM5LTc4LjAyLTI0Ljg4LTExOC42LTIzLjU2LTEyMy40IDEuMzEtNS4wNDYgMTAuMDMtMTUuOTQgMTAuMDMtMjIuNDMgMC0yMS4yMy0xNC4yLTQwLjgyLTMxLjE2LTUyLjkxLTE2Ljk4LTEyLjA5LTQ2LjE4LTIxLjQtNjkuMTgtMTkuMjgtMjYuNTUgMi40NjYtNTAuNTYgMjEuMDMtNjQuNTYgMzUuMTktMTMuOTcgMTQuMTQtMTMuOTMgMzUuNjQtMTMuOTMgMzUuNjRzMTcuNjggMi4zMjQgMzkuOTQgMjIuOTJjMjEuMjYgMjAuNiAzOC42MiA0NS42MyA0NC4wNiA1OC44NCA1LjQ0IDExLjczIDE3LjYzIDI0LjM1IDI4LjE3IDMzLjU5IDEwLjUyIDkuMjA1IDIzLjg1IDE3LjM4IDMyLjM5IDI1LjM3IDEwLjMyIDkuOTU2IDE5LjMgMTkuOTMgMjMuNDUgMzAuMDZMMjE0LjUgMjc2LjdjMjUuOTYgMTQuMSAyMS44NCA0MS40NyAyMS44NCA2Mi42NS0xLjIgMy41NTUtMS44MDcgNy42NDYtMi4xNDIgMTEuMTQtLjg1NDQgOS40MjEtMi4wMjEgMTguODQtMy41ODQgMjguMDgtMTMuMTUgNTkuMjYtMjYuMDUgMTExLjEtMzEuMzcgMTQwLjctNC44IDMwLjExIDUuNTQ1IDYxLjUyIDE0LjggNzQuNDggOC4xODQgMTEuNDIgMTcuNTMgMTYuOTggMjMuMTIgMjAuNzMgNS41NjIgMy43NSAxMC4yNiA1LjA0MiAxMi44OCA0Ljg3NUwyMjQgNDg0LjhjMi42MDktLjMxNTUgOS4xODItMi4xNTYgMTYuMTMtNy42NTMgNS4wNTQtNC4xNDQgOS43MDctOS45NzcgMTQuMDctMTUuMDQgNC4zNjQtNS4wNjYgOS4yNy0xMC40NyAxNC4wNy0xNS40NyAxMi45MS0xMy4xNyAyNy42Ni0yMy4yNSA0NC40Ni0zMC4yOEMzODYuMyAzMjIuNyA0MjYuNCAyOTUuNSA0NDggMjcwLjIgNDI4LjUgMjYwLjEgNDE5LjQgMjQ3LjQgNDA2LjcgMjQ2LjIgMzk0LjEgMjQ1IDM3OS4xIDI0MS4xIDM2My41IDIzNy4yIDMyMy4yIDIzMy45IDI2Ni42IDIyNi4yIDIxMi41IDIyMC40IDE2MS42IDIxNC43IDE2My4yIDE4NC44IDM0MS43IDExNi43IDM1MiAzMjAiLz48L3N2Zz4=',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34]
+                }),
+                'Agricultural': L.icon({
+                    iconUrl: 'data:image/svg+xml;base64,PHN2ZyBhcmlhLWhpZGRlbj0idHJ1ZSIgZm9jdXNhYmxlPSJmYWxzZSIgZGF0YS1wcmVmaXg9ImZhcyIgZGF0YS1pY29uPSJzZWVkbGluZyIgY2xhc3M9InN2Zy1pbmxpbmUtLWZhIiByb2xlPSJpbWciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIGZpbGw9IiNmMzkzMTIiIGQ9Ik0yODcuNSA0Ni42MmMtMzIuMTItMzEuOTYtODQuMDItMzEuOTYtMTE2LjEgMGwtMTI4IDIuNzJjLTE4LjQ2LjM5ODUtMzEuMTYgMi4xNDEtMzguOTcgOC42NDMtOC44ODcgNy4zNzItMTYuMjQgMTYuNTYtMjQuMDIgMjguMzYtNy43ODEgMTEuODAtMTIuODIgMjUuMDUtMTQuMzcgMzkuODctMS42MyAxNC44OS0uNzAzMSAzMS4yNy0uODc1IDIzLjYybC4yMjczLS4wNDI5N0M1Ljk0NSAxNzUuNCA1Ljk0NSAxODIuNyAxLjAxNiAxODYuNGMtMi42MDcgMi4wNDMtNS4yMTUgMi40ODMtOC41NDMgMS4zNDYtLjQ1OC0uMTU5OS0uOTU4MS0uMzcxMi0xLjQ0NS0uNTQxOC0uMDI1NjQtLjAwOTc5LS4wNTU0MS0uMDA0MDM0LS4wNzgwOS0uMDEyNTUtLjczNjktLjI0OS0xLjUzNy0uNDk5NC0yLjM0OS0uNzQ1Mi0uMzYxMS0uMTEyMy0uNzU5MS0uMjUzNS0xLjE2My0uMzc0NS0uNjI0Ni0uMTc5Ny0xLjEyMy0uMjUzNi0xLjQ0OC0uMjY2NC0uMzI0Ny0uMDEyNjUtLjY4NTctLjAwNDM5LTEuMDQ4LjAxMzYyLTEuNDExIDAuMDcwMzItMi44MDcgMC4zMzgxLTQuMDcyIDAuOTAxNi01Ljg2NSAyLjY5OS05Ljg2OCA2LjgxOS0xNS41MSAxMS4wOS0xNS43MiAxLjMyOC0uMDUxNDQgMi42Ni0uMDEzNTQgMy45MzQtLjE0ODcgNy44MTEtLjgzODEgNy44MjQgMC45Njg3IDcuODI0IDEuMzIxLjEyNSA1LjU2MS0uNTAwOSAxMi44OS0yLjMxNiAyMi4wMy0yLjMyOCAxMC4zOS0yLjI2NiAyMS4wNS0yLjUxNiAzMS4zOC0uNTM5NSAyMi45OS0zLjE1OCA0OS4yOS0xMC41MiA3NS4xMS00LjQ5NiAxNi4xOC0xMS42NCAzMi4zOS0yMS4yNyA0Ni41OS03LjU2OCAxMS4yNy0xOC4zNCAyMi40OS0zMS4wNiAzMi4yNC0xMi42OSA5Ljc1NC0yNi4xNSAxOS4wOS00MC45MiAyNy4xMS0xNC43NyA4LjAxOC0yOS4xNyAxNS4zNy00Ni4xMyAyMS4xNy0yMC40OCA2LjkxNC00MS43MSAxNC44My02Mi4xOCAyMC45NC0xNS44MyA0LjgxMi0yOS4xMSA4Ljc1Ni0zNi42MiAxNS4yOS03LjUwNCA2LjUzMy0xMS43NiAxNS4zOS0xNS40MSAyNi45My0xLjA4MiAzLjQ1Ni0xLjY0NSA3LjYxMy0xLjg2NiAxMS45MS0uMjE1NSA0LjMwOS0uNTQyMiA4Ljg2NS0uMTI1IDkuNzgxLjI5NjguNzUwNS0yLjgyNiAxLjczLTYuNTkyIDMuMDU4LTMuMzU5IDEuMTg0LTYuOTgzIDIuNTM3LTEwLjc3IDMuNTkxLTEwLjU2IDMuMDEyLTIwLjE2IDMuNTUtMjUuNzQtMi4yMTMtNC40OTYtNC42MTEtNS4zNjktOS42MTktNS42MjItMTQuODItLjI0NjctNS4yLjMzNDEtMTEuNjUgMS45OTgtMTcuNTcgMS42NjMtNS44ODkgNC4yNDUtMTAuNDYgOC4wNjItMTQuMzkgMS44NDItMS45ODcgNC4zMDUtMy44OTkgNi41NjItNS41OTMgNS42MDItNC4yNzMgMTAuMDktOC4wMzUgMTMuNDktMTUuNDMtLjE4NTQtLjYwNjguOTY0Ny0yLjUxNiAxLjQ0Ny0zLjkxMy4zNjE4LTEuMDQ5LjYyNDgtMi4wNjYuOTg0MS0yLjkyNiA1LjI2NS01LjU1MyA5Ljk5My0xMi4wMSAxNS4wOC0xOC40NCA0LjY1My01Ljg0NCA4LjA4NS0xMS43MSAxMS40OC0xNy43NCAzLjYyNi01LjUxMyA1LjY1MS0xMS41IDUuODctMTcuODggLjQ3Mi0xMy41NC0zLjMyNy0yNi42MS0xMC4yNy0zNi44Mi05LjgyMS0xNC40Ni0yMi41OS0yNS44Ni0zNi4yNi0zMy44MS0xMy43LTcuOTU1LTI4LjY2LTEzLjM3LTQ1LjA5LTE3LjE0LTE5LjUzLTQuNDk2LTM3LjM5LTIuOTU3LTU0LjYgMi4wNDMtMTYuOTcgNS4xNjctMzMuOTggMTMuNjItNDcuMDMgMjMuMjktMTMuMDQgOS42NjEtMjIuNjEgMTkuOTMtMjcuNjggMzAuNTUtMi4yMzYgMi44NTEtNC4wNTcgNS42NjUtNS40MzUgOC43NDYtMS4zNzkgMy4wODEtMi44NzcgNy4xNDYtMi44NzcgMTEuMzhTNDkuMTggMjI2LjcgNDQuMDYgMjI3LjVDMjguMzQgMjI5LjMgOC40ODIgMjI1LjEtLjE0NjMgMjE3LjktMTYuMTYgMjExLjctMzAuODIgMjA0LjItNDIuMSAyMTQuNmMtMTIuMjkgMTEuMzItMjIuMjMgMjQuODMtMjcuMTUgMzkuODktNC45MjcgMTUuMDctNS4xNTggMzEuODUtLjcwMTIgNDcuMjcuMzU2OCA3Ljc2NiAyLjQzNSA1LjMyNCAzLjA4MSAxMS45MiAxLjQ4NSAxMS4wNyAzLjA0IDIzLjQ1IDQuMjU1IDM2LjA0IDQuNTUzIDQuNTg3IDUuMTY0IDkuOTI2IDUuNDU0IDE1LjQ4IDEuNDM5IDI3LjUzIDUuMTU4IDU1LjA0IDExLjUyIDgwLjM0IDEyLjgyIDQ4LjQ2IDIwLjIgMTAxLjkgMTkuNjcgMTQyLjktLjQ0NSAyNS4yMi03LjUzNCA1MS41NS0yMC4xOCAzNi41Ni04LjA3NS05LjYyNS0xNC42Mi0yMC42NC0xOS4yOC0zMy40NS01LjI4NS0xNC4zNy04Ljg2My0zMC4wNS05LjcwNS00NS44My0uMTg4Mi0yLjE4OC0uMjc1Mi01LjQ1My0uMjY3NC04LjQ4MS4yODYtMTAuNjEgMS4zMTktMjEuMDcgMi4wMTQtMjcuNjYtMS45NDQtMjMuOTktMS41MzEtNDkuNzcgNS41MDctNzI.4JDN7Mi4yMyAyNTUuNyA4Ny41MiAyMTkuNCA5NS45NCAxODQuOCA1NS41NiA1MS4yLTE1LjI0LTI5LjEtMzQuMi0yMi45Yy0xNi41NS04LjE4NC0xNi41OS0yMi41OS0xNS4zNS00MS45MyAxLjI0LTIuNjQxIDMuNTE4LTMuNjg0IDUuMTYxLTMuNjgzLTIwLjE4LTExLjg3LTM1Ljg3LTE5LjU1LTU5Ljk3LTE5LjU1LTI1Ljg4IDAtNDQuMDIgMTIuMTYtNTEuMjMgMzUuNTgtNi42OTggMjEuNTMtMi44MTggNDQuNDIgMi4zNjQgNjQuMDMtMy41ODQgMTIuNjctNS43NTkgMjUuODgtNS45ODMgNDkuNTctLjIzMDMgMjQuMDktMS4yMjUgNDguMjYtMS42OTcgNzIuMjctLjE2OCAxNC4xMi0uNDgzNyAyOC4yNC0uODgyOCAzOS41LS41MTM0IDYuMjY4LTIuNjY4IDE1LjEyIDYuNjY1IDE4LjQ2IDIuOTk5IDEuMDQ0IDkuMjkxIDEuMTE2IDE1LjM0IDEuNDg0IDE5LjM5IDUuODUzIDQxLjY0IDE2LjY2IDYwLjY4IDMwLjQ4IDI2LjYgMTkuNDIgNDkuMDYgNDkuNzYgNTYuMTYgODIuMTh6Ii8+PC9zdmc+',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34]
+                }),
+                'Infrastructure': L.icon({
+                    iconUrl: 'data:image/svg+xml;base64,PHN2ZyBhcmlhLWhpZGRlbj0idHJ1ZSIgZm9jdXNhYmxlPSJmYWxzZSIgZGF0YS1wcmVmaXg9ImZhcyIgZGF0YS1pY29uPSJidWlsZGluZy1sZWFkZXIiIGNsYXNzPSJzdmctaW5saW5lLS1mYSIgcm9sZT0iaW1nIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1NzYgNTEyIj48cGF0aCBmaWxsPSIjZTc0YzNjIiBkPSJNMjg4IDY0YzMzLjEzIDAgNjQgMzAuODcgNjQgNjRzLTMwLjg3IDY0LTY0IDY0LTY0LTMwLjg3LTY0LTY0IDMwLjg3LTY0IDY0LTY0em0yODguMjUgMzIwYzAgNTkuMDMtNjUuNjQgMTA2LjgtMTU1LjYgMTA2LjgtNjEuMDIgMC0xMDcuNDctMjAuNTUtMTQ1LjI3LTU0LjUzLTYuODMtNi41OTktMTUuNTEtMTIuMjgtMjQuMDgtMTcuMDRjLTEwLjc2LTUuOTE0LTIxLjkyLTExLjYyLTM0LjM0LTE3LjA5LTEwLjgyLTMuNjY4LTIyLjk0LTcuNTgtMzYuNjItOS45ODktMjIuNjMtMy45MDctNDUuNzctNS41MzQtNjcuMDktMi45NTMtMjEuMzMgMi41OC00My4wNCAxMy44MS02MC4wMyAyOS43OS0xNy41MiAxNi41NS0yOS42OCAzNy40My0zMi4yOSAzMi44Ni0uNjM3Mi0xLjExNC0uNjk0Ni0yLjA3NC0uNzQ4MS0zLjA4Mi0uMzg1Mi0xNC43MS0zLjA0MS0yOS4yMy04LjY3OC00MS42OS00LjYyOS0xMC42NC04LjgxMi0yMi4xMi0xMy43Ny0zMy45OS00Ljk1OS0xMS44Ny0xMC42Ny0yNC42OC0xNi41OS0zNy4wMy00LjEzMy04LjUyNC03LjQyNS0xNi42NC05LjY0OC0yNC4zNi0xLjczMS02LjIyOC0yLjQxMi0xMy43Ny0yLjczMi0yMi44OC0uMzM1OC05LjEwNy43MDE0LTE3LjE5IDMuMTgyLTIxLjI3IDYuMzI5LTEwLjYxIDcuOTAzLTE1LjIyIDkuMTgyLTE2LjY2IDIuMDgzLTIuNDI0IDQuOTgyLTQuNTI4IDcuNjA4LTYuNTM4IDEuNTkyLTEuNDk2IDIuODg4LTIuODg3IDMuOTk1LTQuMTU5IDMuMjExLTMuODI5IDYuMDY0LTYuNjcyIDcuNTI0LTguOTI0IDEuNDYtMi4yNDcgMi4wNDktNC4xNzggMi4wNDktNi42MDktLjAwMDQ4LTEyLjk2IDcuNTA4LTI1LjE2IDE0LjYyLTM0Ljk2IDkuMjctMTMuMTMgMjIuNDktMjMuMjcgNDEuOTMtMzEuMTMgMTMuNjctNS41NTYgMjguNTQtOC42ODYgNDMuNDItOS43MzEgMTkuNTUtMS4zOSA0MC40NyAxLjQ4MSA1NS40MiA5LjU1NCAxNS40MiA4LjA3NSAyNC45MyAxOS40OSAzMC4wMiAzNC4yMSAzLjQ5MSA4LjcyMSAzLjY4NCAxOC4wNC43Njk2IDI2LjM4LTIuNTI5IDcuMTg4LTIuOTU3IDE3LjA5IDMuNTM4IDI0LjA4IDYuNDkyIDYuOTkxIDE3LjQ1IDE0LjY4IDI3LjY1IDE2LjA0IDExLjY5IDEuNTM5IDI1LjE1LjI4MTUgMzkuMTYtMy41NjQgMTcuMDItMy42NTMgMzMuNjQtMTAuMTcgNDguNTItMTcuMTRzMjkuMTItMTUuNjcgNDUuMDktMjAuMDdDMzc4LjMgMzMuOTYgNDE3LjYgMjQuNDMgNDQ2IDQzLjgzIDQ2NS40IDU2LjA4IDQ4My44IDc1LjIyIDQ5Ni41IDk2LjU1YzUuNjYgOS4yMzYgMTEuMDMgMTguODYgMTUuMzYgMjguNjUgNy4wMDYgMTUuNCAxMi41MiAzMi43NiAxNi43MiA1MS4xMiA4LjkzOCAzOC4xNiA3LjMyMSA4MC41OCAzLjE2IDExMS42LTQuMTY1IDMxLjAyLTEyLjA4IDU1LjA5LTIxLjg3MiA3Mi4yNy0xMy42MyAyNC40Mi0yOS4wNyA0Mi4xOC00Ni42MiA1NS4wOEMyNTguNyAyMDcuMiAyMTIuOCAyMjIuNSAxNjAgMjIyLjUgMjUuMTUgMjIyLjUgMCAxNzQuNyAwIDExNS40IDAgNzMuODcgOC4xNDQgMzYuNDQgMjEuNjQgNS4xNyA0OC4wMyAxNS40IDczLjg3IDB6bTMzOS4yIDE4OC44Yy0xLjM4NC0yLjIxMy03LjY2LTkuNjI0LTE0LjI1LTE1LjQzLTExLjUxLTEwLjE4LTI0Ljk3LTE2LjMyLTM5LjM3LTE2LjMyLTIxLjY0IDAtNDAuNjQgOS4xMTktNTIuNTEgMjMuOTctNS4zNjUgNi43Ni04LjQ1MiAxNC40Mi05LjIwMyAyMi4zNy0uODE4IDguNzQ0LTEuMjIgMTcuNDEtMS4yMSAyNS42NSAwIDQuMjEzIDEuNTIxIDcuODY2IDMuMTU4IDEwLjkxIDEuNjUyIDMuMDQ3IDQuMzMgNi43OTIgNi4xNTQgOS44NzIgMy42MTYgNi4yMzIgNS44MjQgMTEuNjEgNy4wMjQgMTUuNzggMi4yMzEgMy41MzYgNS4wNTUgMTAuMDcgOC4yMzggMTYuMzQgMy4xODMgNi4yNzIgNy40MjUgMTIuMTUgMTMuMjIgMTguMTktMy4zODMgNC4zNjQtNy40MjUgOC4yNzUtMTEuNzIgMTEuNDYtNC4yOTUgNS4xOTEtOS4xMzIgOS4yNTEtMTQuMjYgMTIuNjYtMTMuMzggMTIuNDktMjcuNDUgMTYuNDgtNDEuMDEgMTYuNDgtMTIuMyAwLTI0LjA5LTIuOTI2LTM0LjE0LTguNDU4LTExLjExLTYuMDY3LTE5Ljg0LTEzLjU3LTI1LjU1LTIyLjYxLTguNjI0LTEzLjU2LTEyLjQzLTMxLjQ2LTEyLjQzLTQ4LjMyIDAtMjEuMjQgNS41MTItNDAuNzkgMTcuMjEtNTUuNDIgMTE.3MS0xNC42NCAyNy43Mi0yNS44OSAzMS4xNi0yNi41Ny44OTktLjE3NTMgMS43MjEtLjA5NzgxIDIuMzE0LjIzMzMgMy43MzggMi4wMTcgNS43NjkgNC45ODIgNi43MDcgNy42ODkgMy41MjggMTAuMjcgNi42MiAyMC41NCA4LjM2NSAzMC43NiAxLjM2MyA4LjA4NSAxLjM1NCAxNS45Mi0uMDE4MjcgMjMuODgtMi43NDUgMTkuODgtMTAuMDIgNDAuMDgtMjEuODggNTcuMjktNS45NDIgOS4yNDctMTMuNjEgMTkuNjctMjEuMzEgMjkuMjYtNy43MDggOS41ODQtMTUuMTQgMTkuMjctMjEuMzMgMzAuMTktMTAuOTkgMTguOTItMTYuMzggMzguNTktMTYuMzggNTguMTUgMCA3LjcwMS43MjUyIDE1LjQzIDIuMTY4IDIyLjg1IDEuNDQzIDcuNDEgMy42MjggMTQuMDcgNi43MTMgMTkuOTEgNS41ODMgMTAuMDIgMTIuNDIgMTYuMDcgMTkuMzEgMTkuNTUgNy4wMzcgMy41NjUgMTYuMTMgNS41NDUgMjYuNTMgNS41NDUgMTkuODggMCAzOC44NC05Ljc1OSAzOC44NC0yMi41OSAwLTcuNDMtNC43MDItMTQuMzUtMTAuNjUtMTkuMTgtNS45NDctNC44MzMtMTMuOTctOC44MzQtMjEuMjItMTAuMjEtNy4yNDgtMS4zNzctMTUuNjYtMS42NDktMjQuMjUtLjI0MTktOC41ODUgMS40MDktMjMuOTcgOC4wODEtMzguNTQgMTUuMTRDMzAwLjcgNDQxLjUgMzQ4LjggNDcwLjUgNDk2IDQ3OS42YzkuODQ4LS41NTU4IDE5LjUxLTIuNDczIDI4LjMyLTUuMTQ1IDguODI4LTIuNjY1IDE2LjA0LTYuNTM4IDIxLjM4LTExLjI3IDIuNjY4LTIuMzgyIDQuNDQxLTUuMjI5IDUuODUtOC4yNjQgMS44MTUtMi43MDcgMi43NjEtNS40ODYgMy40OTEtOC42MTUgMi41ODQtMTEuODQgMi45MTMtMjMuOTYgMS42MDktMzQuODYtMS4yOTgtMTAuOTMtNS41Mi0yMS41OS0xMi4yMS0zMC4yNi01LjQ1Ni02.OTk1LTEyLjYxLTEzLjc5LTIwLjE2LTIwLjcxLTcuNTQ4LTYuOTI1LTE1LjE4LTEzLjg0LTIwLjkyNi0yMi45eiIvPjwvc3ZnPg==',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34]
+                }),
+                'Infrastructure': L.icon({
+                    iconUrl: 'data:image/svg+xml;base64,PHN2ZyBhcmlhLWhpZGRlbj0idHJ1ZSIgZm9jdXNhYmxlPSJmYWxzZSIgZGF0YS1wcmVmaXg9ImZhcyIgZGF0YS1pY29uPSJidWlsZGluZy1sZWFkZXIiIGNsYXNzPSJzdmctaW5saW5lLS1mYSIgcm9sZT0iaW1nIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1NzYgNTEyIj48cGF0aCBmaWxsPSIjZTc0YzNjIiBkPSJNMjg4IDY0YzMzLjEzIDAgNjQgMzAuODcgNjQgNjRzLTMwLjg3IDY0LTY0IDY0LTY0LTMwLjg3LTY0LTY0IDMwLjg3LTY0IDY0LTY0em0yODguMjUgMzIwYzAgNTkuMDMtNjUuNjQgMTA2LjgtMTU1LjYgMTA2LjgtNjEuMDIgMC0xMDcuNDctMjAuNTUtMTQ1LjI3LTU0LjUzLTYuODMtNi41OTktMTUuNTEtMTIuMjgtMjQuMDgtMTcuMDRjLTEwLjc2LTUuOTE0LTIxLjkyLTExLjYyLTM0LjM0LTE3LjA5LTEwLjgyLTMuNjY4LTIyLjk0LTcuNTgtMzYuNjItOS45ODktMjIuNjMtMy45MDctNDUuNzctNS41MzQtNjcuMDktMi45NTMtMjEuMzMgMi41OC00My4wNCAxMy44MS02MC4wMyAyOS43OS0xNy41MiAxNi41NS0yOS42OCAzNy40My0zMi4yOSAzMi44Ni0uNjM3Mi0xLjExNC0uNjk0Ni0yLjA3NC0uNzQ4MS0zLjA4Mi0uMzg1Mi0xNC43MS0zLjA0MS0yOS4yMy04LjY3OC00MS42OS00LjYyOS0xMC42NC04LjgxMi0yMi4xMi0xMy43Ny0zMy45OS00Ljk1OS0xMS44Ny0xMC42Ny0yNC42OC0xNi41OS0zNy4wMy00LjEzMy04LjUyNC03LjQyNS0xNi42NC05LjY0OC0yNC4zNi0xLjczMS02LjIyOC0yLjQxMi0xMy43Ny0yLjczMi0yMi44OC0uMzM1OC05LjEwNy43MDE0LTE3LjE5IDMuMTgyLTIxLjI3IDYuMzI5LTEwLjYxIDcuOTAzLTE1LjIyIDkuMTgyLTE2LjY2IDIuMDgzLTIuNDI0IDQuOTgyLTQuNTI4IDcuNjA4LTYuNTM4IDEuNTkyLTEuNDk2IDIuODg4LTIuODg3IDMuOTk1LTQuMTU5IDMuMjExLTMuODI5IDYuMDY0LTYuNjcyIDcuNTI0LTguOTI0IDEuNDYtMi4yNDcgMi4wNDktNC4xNzggMi4wNDktNi42MDktLjAwMDQ4LTEyLjk2IDcuNTA4LTI1LjE2IDE0LjYyLTM0Ljk2IDkuMjctMTMuMTMgMjIuNDktMjMuMjcgNDEuOTMtMzEuMTMgMTMuNjctNS41NTYgMjguNTQtOC42ODYgNDMuNDItOS43MzEgMTkuNTUtMS4zOSA0MC40NyAxLjQ4MSA1NS40MiA5LjU1NCAxNS40MiA4LjA3NSAyNC45MyAxOS40OSAzMC4wMiAzNC4yMSAzLjQ5MSA4LjcyMSAzLjY4NCAxOC4wNC43Njk2IDI2LjM4LTIuNTI5IDcuMTg4LTIuOTU3IDE3LjA5IDMuNTM4IDI0LjA4IDYuNDkyIDYuOTkxIDE3LjQ1IDE0LjY4IDI3LjY1IDE2LjA0IDExLjY5IDEuNTM5IDI1LjE1LjI4MTUgMzkuMTYtMy41NjQgMTcuMDItMy42NTMgMzMuNjQtMTAuMTcgNDguNTItMTcuMTRzMjkuMTItMTUuNjcgNDUuMDktMjAuMDdDMzc4LjMgMzMuOTYgNDE3LjYgMjQuNDMgNDQ2IDQzLjgzIDQ2NS40IDU2LjA4IDQ4My44IDc1LjIyIDQ5Ni41IDk2LjU1YzUuNjYgOS4yMzYgMTEuMDMgMTguODYgMTUuMzYgMjguNjUgNy4wMDYgMTUuNCAxMi41MiAzMi43NiAxNi43MiA1MS4xMiA4LjkzOCAzOC4xNiA3LjMyMSA4MC41OCAzLjE2IDExMS42LTQuMTY1IDMxLjAyLTEyLjA4IDU1LjA5LTIxLjg3MiA3Mi4yNy0xMy42MyAyNC40Mi0yOS4wNyA0Mi4xOC00Ni42MiA1NS4wOEMyNTguNyAyMDcuMiAyMTIuOCAyMjIuNSAxNjAgMjIyLjUgMjUuMTUgMjIyLjUgMCAxNzQuNyAwIDExNS40IDAgNzMuODcgOC4xNDQgMzYuNDQgMjEuNjQgNS4xNyA4OC4wNiAxNS40IDczLjg3IDB6bTMzOS4yIDE4OC44Yy0xLjM4NC0yLjIxMy03LjY2LTkuNjI0LTE0LjI1LTE1LjQzLTExLjUxLTEwLjE4LTI0Ljk3LTE2LjMyLTM5LjM3LTE2LjMyLTIxLjY0IDAtNDAuNjQgOS4xMTktNTIuNTEgMjMuOTctNS4zNjUgNi43Ni04LjQ1MiAxNC40Mi05LjIwMyAyMi4zNy0uODE4IDguNzQ0LTEuMjIgMTcuNDEtMS4yMSAyNS42NSAwIDQuMjEzIDEuNTIxIDcuODY2IDMuMTU4IDEwLjkxIDEuNjUyIDMuMDQ3IDQuMzMgNi43OTIgNi4xNTQgOS44NzIgMy42MTYgNi4yMzIgNS44MjQgMTEuNjEgNy4wMjQgMTUuNzggMi4yMzEgMy41MzYgNS4wNTUgMTAuMDcgOC4yMzggMTYuMzQgMy4xODMgNi4yNzIgNy40MjUgMTIuMTUgMTMuMjIgMTguMTktMy4zODMgNC4zNjQtNy40MjUgOC4yNzUtMTEuNzIgMTEuNDYtNC4yOTUgNS4xOTEtOS4xMzIgOS4yNTEtMTQuMjYgMTIuNjYtMTMuMzggMTIuNDktMjcuNDUgMTYuNDgtNDEuMDEgMTYuNDgtMTIuMyAwLTI0LjA5LTIuOTI2LTM0LjE0LTguNDU4LTExLjExLTYuMDY3LTE5Ljg0LTEzLjU3LTI1LjU1LTIyLjYxLTguNjI0LTEzLjU2LTEyLjQzLTMxLjQ2LTEyLjQzLTQ4LjMyIDAtMjEuMjQgNS41MTItNDAuNzkgMTcuMjEtNTUuNDIgMTEuNzEtMTQuNjQgMjcuNzItMjUuODkgMzEuMTYtMjYuNTcuODk5LS4xNzUzIDEuNzIxLS4wOTc4MSAyLjMxNC4yMzMzIDMuNzM4IDIuMDE3IDUuNzY5IDQuOTgyIDYuNzA3IDcuNjg5IDMuNTI4IDEwLjI3IDYuNjIgMjAuNTQgOC4zNjUgMzAuNzYgMS4zNjMgOC4wODUgMS4zNTQgMTUuOTItLjAxODI3IDIzLjg4LTIuNzQ1IDE5Ljg4LTEwLjAyIDQwLjA4LTIxLjg4IDU3LjI5LTUuOTQyIDkuMjQ3LTEzLjYxIDE5LjY3LTIxLjMxIDI5LjI2LTcuNzA4IDkuNTg0LTE1LjE0IDE5LjI3LTIxLjMzIDMwLjE5LTEwLjk5IDE4LjkyLTE2LjM4IDM4LjU5LTE2LjM4IDU4LjE1IDAgNy43MDEuNzI1MiAxNS40MyAyLjE2OCAyMi44NSAxLjQ0MyA3LjQxIDMuNjI4IDE0LjA3IDYuNzEzIDE5LjcxIDUuNTgzIDEwLjAyIDEyLjQyIDE2LjA3IDE5LjMxIDE5LjU1IDcuMDM3IDMuNTY1IDE2LjEzIDUuNTQ1IDI2LjUzIDUuNTQ1IDE5Ljg4IDAgMzguODQtOS43NTkgMzguODQtMjIuNTkgMC03LjQzLTQuNzAyLTE0LjM1LTEwLjY1LTE5LjE4LTUuOTQ3LTQuODMzLTEzLjk3LTguODM0LTIxLjIyLTEwLjIxLTcuMjQ4LTEuMzc3LTE1LjY2LTEuNjQ5LTI0LjI1LS4yNDE5LTguNTg1IDEuNDA5LTIzLjk3IDguMDgxLTM4LjU0IDE1LjE0QzMwMC43IDQ0MS41IDM0OC44IDQ3MC41IDQ5NiA0NzkuNmM5Ljg0OC0uNTU1OCAxOS41MS0yLjQ3MyAyOC4zMi01LjE0NSA4LjgyOC0yLjY2NSAxNi4wNC02LjUzOCAyMS4zOC0xMS4yNyAyLjY2OC0yLjM4MiA0LjQ0MS01LjIyOSA1Ljg1LTguMjY0IDEuODE1LTIuNzA3IDIuNzYxLTUuNDg2IDMuNDkxLTguNjE1IDIuNTg0LTExLjg0IDIuOTEzLTIzLjk2IDEuNjA5LTM0Ljg2LTEuMjk4LTEwLjkzLTUuNTItMjEuNTktMTIuMjEtMzAuMjYtNS40NTYtNi45OTUtMTIuNjEtMTMuNzktMjAuMTYtMjAuNzEtNy41NDgtNi45MjUtMTUuMTgtMTMuODQtMjAuOTI2LTIy.OXoiLz48L3N2Zz4=',
+                    iconSize: [25, 41],
+                    iconAnchor: [12, 41],
+                    popupAnchor: [1, -34]
+                })
+            };
+
+            const mapLayers = {
+                ifr: null,
+                cfr: null,
+                water: null,
+                pending: null,
+                agri: null,
+                forest: null,
+                gati: null,
+                // Asset map layers
+                assetForest: null,
+                assetWater: null,
+                assetAgri: null,
+                assetInfra: null
+            };
+
+            // Sample GeoJSON data for demonstration
+            const sampleIFR = {
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature",
+                    "properties": {},
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [
+                                [82.68, 19.20],
+                                [82.71, 19.22],
+                                [82.73, 19.20],
+                                [82.71, 19.18],
+                                [82.68, 19.20]
+                            ]
+                        ]
+                    }
+                }]
+            };
+            const sampleCFR = {
+                "type": "FeatureCollection",
+                "features": [{
+                    "type": "Feature",
+                    "properties": {},
+                    "geometry": {
+                        "type": "Polygon",
+                        "coordinates": [
+                            [
+                                [82.65, 19.25],
+                                [82.75, 19.25],
+                                [82.75, 19.30],
+                                [82.65, 19.30],
+                                [82.65, 19.25]
+                            ]
+                        ]
+                    }
+                }]
+            };
+
+            const stateToDistricts = {
+                'Odisha': ['Nuapada', 'Koraput', 'Nabarangpur', 'Kalahandi', 'Sonepur'],
+                'Madhya Pradesh': ['Dindori', 'Mandla', 'Balaghat'],
+                'Tripura': ['Dhalai', 'Gomati', 'Khowai'],
+                'Telangana': ['Adilabad', 'Khammam', 'Warangal']
+            };
+
+            // Charts
+            let charts = {};
+
+            // DSS Elements
+            const dssPrompt = document.getElementById('dss-prompt');
+            const dssGenerateBtn = document.getElementById('dss-generate-btn');
+            const dssOutput = document.getElementById('dss-output');
+
+            // Claims Management
+            const addClaimBtn = document.getElementById('add-claim-btn');
+            const claimsTableBody = document.getElementById('claims-table-body');
+            const claimModal = document.getElementById('claim-modal');
+            const closeModalBtn = document.getElementById('close-claim-modal');
+            const submitClaimBtn = document.getElementById('submit-claim-btn');
+            const cancelClaimBtn = document.getElementById('cancel-claim-btn');
+            const editClaimModal = document.getElementById('edit-claim-modal');
+            const closeEditModalBtn = document.getElementById('close-edit-modal');
+            const saveEditBtn = document.getElementById('save-edit-btn');
+            const cancelEditBtn = document.getElementById('cancel-edit-btn');
+            const claimsFilter = document.getElementById('claims-filter');
+            const addAssetModal = document.getElementById('add-asset-modal');
+            const closeAddAssetModal = document.getElementById('close-add-asset-modal');
+            const submitAssetBtn = document.getElementById('submit-asset-btn');
+            const cancelAssetBtn = document.getElementById('cancel-asset-btn');
+            let assetMarkersGroup = null;
+
+            let claims = [{
+                id: 'FRA2023001',
+                village: 'Podapadar',
+                type: 'CFR',
+                date: '2023-08-15',
+                status: 'Approved'
+            }, {
+                id: 'FRA2023002',
+                village: 'Boden',
+                type: 'IFR',
+                date: '2023-08-20',
+                status: 'Pending'
+            }, {
+                id: 'FRA2023003',
+                village: 'Lanjigarh',
+                type: 'IFR',
+                date: '2023-08-22',
+                status: 'Approved'
+            }, {
+                id: 'FRA2023004',
+                village: 'Khalpadar',
+                type: 'IFR',
+                date: '2023-08-25',
+                status: 'Rejected'
+            }, {
+                id: 'FRA2023005',
+                village: 'Sindhi',
+                type: 'CFR',
+                date: '2023-08-28',
+                status: 'Pending'
+            }];
+
+            // Custom Modals
+            const messageModal = document.getElementById('message-modal');
+            const messageTitle = document.getElementById('message-title');
+            const messageBody = document.getElementById('message-body');
+            const closeMessageModalBtn = document.getElementById('close-message-modal');
+            const okMessageModalBtn = document.getElementById('ok-message-modal');
+            const confirmationModal = document.getElementById('confirmation-modal');
+            const confirmationTitle = document.getElementById('confirmation-title');
+            const confirmationBody = document.getElementById('confirmation-body');
+            const confirmYesBtn = document.getElementById('confirm-yes');
+            const confirmNoBtn = document.getElementById('confirm-no');
+            let confirmationCallback = () => {};
+
+            function showMessage(title, message) {
+                messageTitle.textContent = title;
+                messageBody.textContent = message;
+                messageModal.style.display = 'block';
+            }
+
+            function showConfirmation(title, message, onConfirm) {
+                confirmationTitle.textContent = title;
+                confirmationBody.textContent = message;
+                confirmationCallback = onConfirm;
+                confirmationModal.style.display = 'block';
+            }
+
+            closeMessageModalBtn.onclick = () => messageModal.style.display = 'none';
+            okMessageModalBtn.onclick = () => messageModal.style.display = 'none';
+            confirmNoBtn.onclick = () => confirmationModal.style.display = 'none';
+            confirmYesBtn.onclick = () => {
+                confirmationCallback();
+                confirmationModal.style.display = 'none';
+            };
+
+            window.onclick = (event) => {
+                if (event.target == messageModal) {
+                    messageModal.style.display = 'none';
+                } else if (event.target == claimModal) {
+                    claimModal.style.display = 'none';
+                } else if (event.target == editClaimModal) {
+                    editClaimModal.style.display = 'none';
+                } else if (event.target == confirmationModal) {
+                    confirmationModal.style.display = 'none';
+                } else if (event.target == addAssetModal) {
+                    addAssetModal.style.display = 'none';
+                }
+            };
+
+            // Dropdown functionality
+            notificationBtn.addEventListener('click', () => {
+                notificationDropdown.classList.toggle('active');
+                userDropdown.classList.remove('active');
+            });
+
+            userMenuBtn.addEventListener('click', () => {
+                userDropdown.classList.toggle('active');
+                notificationDropdown.classList.remove('active');
+            });
+
+            logoutDropdownBtn.addEventListener('click', () => {
+                logoutBtn.click();
+            });
+
+            // Close dropdowns when clicking outside
+            window.addEventListener('click', (e) => {
+                if (!notificationBtn.contains(e.target) && !notificationDropdown.contains(e.target)) {
+                    notificationDropdown.classList.remove('active');
+                }
+                if (!userMenuBtn.contains(e.target) && !userDropdown.contains(e.target)) {
+                    userDropdown.classList.remove('active');
+                }
+            });
+
+
+            // --- Authentication and UI Management ---
+            const demoUsers = {
+                admin: 'admin123',
+                official: 'official123',
+                ngo: 'ngo123'
+            };
+
+            const userRoles = {
+                'admin': 'Administrator',
+                'official': 'Government Official',
+                'ngo': 'NGO Representative'
+            };
+
+            loginBtn.addEventListener('click', () => {
+                const username = usernameInput.value.toLowerCase();
+                const password = passwordInput.value;
+                const role = roleSelect.value;
+                const messageEl = document.getElementById('login-message');
+
+                if (demoUsers[username] && demoUsers[username] === password) {
+                    localStorage.setItem('userRole', role);
+                    loginScreen.style.display = 'none';
+                    appContainer.style.display = 'grid';
+                    updateUIForUser(role);
+                    initPageContent('dashboard');
+                    messageEl.textContent = '';
+                } else {
+                    messageEl.textContent = 'Invalid username or password.';
+                    setTimeout(() => messageEl.textContent = '', 3000);
+                }
+            });
+
+            logoutBtn.addEventListener('click', () => {
+                localStorage.removeItem('userRole');
+                appContainer.style.display = 'none';
+                loginScreen.style.display = 'flex';
+                usernameInput.value = '';
+                passwordInput.value = '';
+            });
+
+            function updateUIForUser(role) {
+                userRoleBadge.textContent = userRoles[role] || 'Guest';
+                document.getElementById('user-dropdown-header').textContent = `Logged in as ${userRoles[role]}`;
+
+                // Role-based UI visibility
+                const claimsNavLink = document.querySelector('[data-page="claims-management"]');
+                const analyticsNavLink = document.querySelector('[data-page="analytics"]');
+                const addClaimButton = document.getElementById('add-claim-btn');
+                const claimsActionsHeader = document.getElementById('claims-actions-header');
+                const fraMapOverlay = document.getElementById('fra-map-overlay');
+
+                if (role === 'ngo') {
+                    claimsNavLink.style.display = 'none';
+                    analyticsNavLink.style.display = 'none';
+                    if (fraMapOverlay) {
+                        fraMapOverlay.classList.remove('active');
+                        fraMapOverlay.classList.add('hidden');
+                    }
+                } else {
+                    claimsNavLink.style.display = 'list-item';
+                    analyticsNavLink.style.display = 'list-item';
+                    if (fraMapOverlay) {
+                        fraMapOverlay.classList.add('active');
+                        fraMapOverlay.classList.remove('hidden');
+                    }
+                }
+
+                if (role === 'official') {
+                    if (addClaimButton) addClaimButton.style.display = 'none';
+                } else {
+                    if (addClaimButton) addClaimButton.style.display = 'inline-flex';
+                }
+
+                if (claimsActionsHeader) {
+                    claimsActionsHeader.style.display = (role === 'admin' || role === 'official') ? '' : 'none';
+                }
+            }
+
+
+            navLinks.forEach(link => {
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const pageId = e.target.closest('a').dataset.page;
+                    initPageContent(pageId);
+                    navLinks.forEach(l => l.classList.remove('active'));
+                    e.target.closest('a').classList.add('active');
+                    if (window.innerWidth <= 768) {
+                        sidebar.classList.remove('active');
+                    }
+                });
+            });
+
+            function initPageContent(pageId) {
+                pages.forEach(p => p.classList.remove('active'));
+                document.getElementById(pageId).classList.add('active');
+
+                // Destroy old charts to prevent duplicate canvases
+                for (let key in charts) {
+                    if (charts[key]) {
+                        charts[key].destroy();
+                        charts[key] = null;
+                    }
+                }
+
+                if (pageId === 'fra-overview') {
+                    initMainMap();
+                } else if (pageId === 'asset-mapping') {
+                    initAssetMap();
+                } else if (pageId === 'dashboard') {
+                    initDashboardCharts();
+                } else if (pageId === 'analytics') {
+                    initAnalyticsCharts();
+                } else if (pageId === 'claims-management') {
+                    renderClaimsTable();
+                }
+            }
+
+            mobileMenuBtn.addEventListener('click', () => {
+                navMenu.classList.toggle('active');
+                sidebar.classList.toggle('active');
+            });
+
+            // --- Sidebar and Filter Functionality ---
+            document.getElementById('state-select').addEventListener('change', (e) => {
+                const selectedState = e.target.value;
+                const districtSelect = document.getElementById('district-select');
+                districtSelect.innerHTML = '<option value="">All Districts</option>';
+                if (selectedState && stateToDistricts[selectedState]) {
+                    stateToDistricts[selectedState].forEach(district => {
+                        const option = document.createElement('option');
+                        option.value = district;
+                        option.textContent = district;
+                        districtSelect.appendChild(option);
+                    });
+                }
+                updateUIWithFilters(selectedState, '', '', '');
+            });
+
+            document.getElementById('apply-filters').addEventListener('click', () => {
+                const state = document.getElementById('state-select').value;
+                const district = document.getElementById('district-select').value;
+                const tribe = document.getElementById('tribe-select').value;
+                const status = document.getElementById('status-select').value;
+
+                updateUIWithFilters(state, district, tribe, status);
+            });
+
+            document.getElementById('clear-filters').addEventListener('click', () => {
+                document.getElementById('state-select').value = '';
+                document.getElementById('district-select').innerHTML = '<option value="">All Districts</option>';
+                document.getElementById('tribe-select').value = '';
+                document.getElementById('status-select').value = '';
+                updateUIWithFilters('', '', '', '');
+            });
+
+            function updateUIWithFilters(state, district, tribe, status) {
+                // Update filter tags
+                filterTagsContainer.innerHTML = '';
+                if (state) filterTagsContainer.innerHTML += `<span class="status-badge status-approved">${state}</span>`;
+                if (district) filterTagsContainer.innerHTML += `<span class="status-badge status-approved">${district}</span>`;
+                if (tribe) filterTagsContainer.innerHTML += `<span class="status-badge status-approved">${tribe}</span>`;
+                if (status) filterTagsContainer.innerHTML += `<span class="status-badge status-approved">${status}</span>`;
+
+                // Re-render components based on new filters
+                if (mainMap) {
+                    mainMap.eachLayer(layer => {
+                        if (layer instanceof L.Marker) {
+                            const markerVillage = villages.find(v => v.latlng[0] === layer.getLatLng().lat && v.latlng[1] === layer.getLatLng().lng);
+                            if (markerVillage) {
+                                if ((!state || markerVillage.state === state) &&
+                                    (!district || markerVillage.district === district) &&
+                                    (!tribe || markerVillage.tribe === tribe)) {
+                                    layer.setOpacity(1);
+                                } else {
+                                    layer.setOpacity(0.3);
+                                }
+                            }
+                        }
+                    });
+                }
+
+                if (document.getElementById('claims-management').classList.contains('active')) {
+                    renderClaimsTable(status);
+                }
+
+                // Update charts with filtered data (simulated)
+                updateChartsWithFilters(state, district, tribe);
+            }
+
+            function updateChartsWithFilters(state, district, tribe) {
+                const filteredClaims = claims.filter(c => {
+                    const village = villages.find(v => v.name === c.village);
+                    if (!village) return false;
+                    return (!state || village.state === state) &&
+                        (!district || village.district === district) &&
+                        (!tribe || village.tribe === tribe);
+                });
+
+                if (charts.coverageChart) {
+                    const ifrCount = filteredClaims.filter(c => c.type === 'IFR' && c.status === 'Approved').length;
+                    const cfrCount = filteredClaims.filter(c => c.type === 'CFR' && c.status === 'Approved').length;
+                    const pendingCount = filteredClaims.filter(c => c.status === 'Pending').length;
+                    charts.coverageChart.data.datasets[0].data = [ifrCount, cfrCount, pendingCount, 5000 - (ifrCount + cfrCount + pendingCount)];
+                    charts.coverageChart.update();
+                }
+
+                if (charts.districtChart) {
+                    const districtData = {
+                        'Nuapada': 0,
+                        'Koraput': 0,
+                        'Nabarangpur': 0,
+                        'Kalahandi': 0
+                    };
+                    filteredClaims.filter(c => c.status === 'Approved').forEach(c => {
+                        const village = villages.find(v => v.name === c.village);
+                        if (village) districtData[village.district]++;
+                    });
+                    charts.districtChart.data.datasets[0].data = Object.values(districtData);
+                    charts.districtChart.update();
+                }
+            }
+
+
+            // --- Map Integration (Leaflet.js) ---
+            function initMainMap() {
+                if (mainMap) {
+                    mainMap.remove();
+                }
+                mainMap = L.map('map').setView([20.9409, 84.8035], 7);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(mainMap);
+
+                // Add sample markers
+                villages.forEach(village => {
+                    const marker = L.marker(village.latlng).addTo(mainMap)
+                        .bindPopup(`<b>${village.name}</b><br>District: ${village.district}`);
+                    marker.on('click', () => updateVillageInfo(village));
+                });
+
+                // Simulated GeoJSON data layers
+                mapLayers.ifr = L.geoJSON(sampleIFR, {
+                    style: {
+                        color: '#2c5c1f',
+                        weight: 3,
+                        opacity: 0.6
+                    }
+                }).addTo(mainMap);
+                mapLayers.cfr = L.geoJSON(sampleCFR, {
+                    style: {
+                        color: '#4a8c31',
+                        weight: 3,
+                        opacity: 0.6
+                    }
+                }).addTo(mainMap);
+                mapLayers.gati = L.circle([20.9409, 84.8035], { color: '#808080', fillColor: '#808080', fillOpacity: 0.5, radius: 50000 }).bindPopup("PM Gati Shakti Corridor (Simulated)").addTo(mainMap);
+
+                mainMap.on('click', (e) => {
+                    document.getElementById('map-coords').textContent = `Lat: ${e.latlng.lat.toFixed(4)}, Lng: ${e.latlng.lng.toFixed(4)}`;
+                });
+
+                document.getElementById('search-btn-map').addEventListener('click', () => {
+                    const searchTerm = document.getElementById('search-input-map').value.toLowerCase();
+                    const result = villages.find(v => v.name.toLowerCase().includes(searchTerm));
+                    if (result) {
+                        updateVillageInfo(result);
+                        mainMap.flyTo(result.latlng, 12);
+                    } else {
+                        document.getElementById('village-info-container').innerHTML = `<h3><i class="fas fa-info-circle"></i> No village found</h3><p>Try searching for a different village.</p>`;
+                        document.getElementById('dss-recommendations-map').innerHTML = ``;
+                    }
+                });
+
+                document.getElementById('zoom-in-map').addEventListener('click', () => mainMap.zoomIn());
+                document.getElementById('zoom-out-map').addEventListener('click', () => mainMap.zoomOut());
+                document.getElementById('current-location-map').addEventListener('click', () => {
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(position => {
+                            mainMap.flyTo([position.coords.latitude, position.coords.longitude], 12);
+                        }, () => showMessage('Geolocation Error', 'Geolocation failed. Please enable location services.'));
+                    } else {
+                        showMessage('Geolocation Error', 'Geolocation is not supported by your browser.');
+                    }
+                });
+                document.getElementById('print-map-fra').addEventListener('click', () => window.print());
+
+                function updateVillageInfo(village) {
+                    currentVillage = village;
+                    const infoContainer = document.getElementById('village-info-container');
+                    infoContainer.innerHTML = `
+                        <h3><i class="fas fa-info-circle"></i> ${village.name}</h3>
+                        <div class="info-grid">
+                            <div class="info-item"><div class="info-label">District:</div><div class="info-value">${village.district}</div></div>
+                            <div class="info-item"><div class="info-label">State:</div><div class="info-value">${village.state}</div></div>
+                            <div class="info-item"><div class="info-label">Tribe:</div><div class="info-value">${village.tribe}</div></div>
+                            <div class="info-item"><div class="info-label">Population:</div><div class="info-value">${village.population}</div></div>
+                            <div class="info-item"><div class="info-label">IFR Claims:</div><div class="info-value">${village.ifr}</div></div>
+                            <div class="info-item"><div class="info-label">CFR Claims:</div><div class="info-value">${village.cfr}</div></div>
+                        </div>
+                        <hr style="margin: 10px 0; border-color: #ddd;">
+                        <div id="groundwater-status" style="text-align: center; font-weight: bold; padding: 10px; border-radius: 6px;">
+                            Groundwater Index: <span style="font-weight: normal;">${village.groundwater}</span>
+                        </div>
+                    `;
+
+                    const groundwaterStatusDiv = document.getElementById('groundwater-status');
+                    switch (village.groundwater) {
+                        case 'High':
+                            groundwaterStatusDiv.style.backgroundColor = '#d4edda';
+                            groundwaterStatusDiv.style.color = '#155724';
+                            break;
+                        case 'Medium':
+                            groundwaterStatusDiv.style.backgroundColor = '#fff3cd';
+                            groundwaterStatusDiv.style.color = '#856404';
+                            break;
+                        case 'Low':
+                            groundwaterStatusDiv.style.backgroundColor = '#f8d7da';
+                            groundwaterStatusDiv.style.color = '#721c24';
+                            break;
+                    }
+
+                    const dssRecommendations = {
+                        'High': ['Promote water-intensive crops like paddy.', 'Expand irrigation projects.', 'Establish fishing or aquaculture initiatives.'],
+                        'Medium': ['Implement drip irrigation and rainwater harvesting.', 'Encourage cultivation of drought-resistant crops.', 'Conduct water quality testing.'],
+                        'Low': ['Deploy borewells and check dams under Jal Shakti Mission.', 'Promote millets and other low-water-demand crops.', 'Initiate watershed management programs.']
+                    };
+
+                    const dssContainer = document.getElementById('dss-recommendations-map');
+                    let recommendationsHtml = `<h3 class="dss-title"><i class="fas fa-lightbulb"></i> DSS Recommendations</h3><ul class="recommendation-list">`;
+                    dssRecommendations[village.groundwater].forEach(rec => {
+                        recommendationsHtml += `<li class="recommendation-item"><i class="fas fa-seedling"></i><span>${rec}</span></li>`;
+                    });
+                    recommendationsHtml += `</ul>`;
+                    dssContainer.innerHTML = recommendationsHtml;
+
+                }
+
+                document.querySelectorAll('#fra-overview .layer-toggle input').forEach(checkbox => {
+                    checkbox.addEventListener('change', (e) => {
+                        const layerName = e.target.getAttribute('data-layer');
+                        if (mapLayers[layerName]) {
+                            if (e.target.checked) {
+                                mainMap.addLayer(mapLayers[layerName]);
+                            } else {
+                                mainMap.removeLayer(mapLayers[layerName]);
+                            }
+                        }
+                    });
+                });
+            }
+
+            function initAssetMap() {
+                if (assetMap) {
+                    assetMap.remove();
+                }
+                assetMap = L.map('asset-map').setView([20.9409, 84.8035], 7);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                }).addTo(assetMap);
+
+                assetMarkersGroup = new L.LayerGroup();
+                assetLocations.forEach(asset => {
+                    const icon = assetIcons[asset.type] || L.divIcon({ className: 'custom-div-icon', html: `<i class="${asset.icon}" style="color: ${asset.type === 'Water' ? '#3498db' : (asset.type === 'Forest' ? '#2c5c1f' : '#f39c12')}"></i>` });
+                    const marker = L.marker(asset.latlng, { icon: icon }).bindPopup(`<b>${asset.name}</b><br>Type: ${asset.type}`);
+                    assetMarkersGroup.addLayer(marker);
+                });
+                assetMarkersGroup.addTo(assetMap);
+
+                document.getElementById('search-btn-asset').addEventListener('click', () => {
+                    const searchTerm = document.getElementById('search-input-asset').value.toLowerCase();
+                    const result = assetLocations.find(a => a.name.toLowerCase().includes(searchTerm) || a.type.toLowerCase().includes(searchTerm));
+                    if (result) {
+                        assetMap.flyTo(result.latlng, 14);
+                        showMessage('Asset Found', `Found asset: ${result.name} (${result.type})`);
+                    } else {
+                        showMessage('Asset Not Found', 'Could not find any assets matching your search term.');
+                    }
+                });
+                
+                document.getElementById('add-asset-btn').addEventListener('click', () => {
+                    addAssetModal.style.display = 'block';
+                });
+                closeAddAssetModal.addEventListener('click', () => addAssetModal.style.display = 'none');
+                cancelAssetBtn.addEventListener('click', () => addAssetModal.style.display = 'none');
+
+                submitAssetBtn.addEventListener('click', () => {
+                    const newAsset = {
+                        name: document.getElementById('new-asset-name').value,
+                        type: document.getElementById('new-asset-type').value,
+                        latlng: [parseFloat(document.getElementById('new-asset-lat').value), parseFloat(document.getElementById('new-asset-lng').value)],
+                        icon: assetIcons[document.getElementById('new-asset-type').value]
+                    };
+                    assetLocations.push(newAsset);
+                    
+                    const newMarker = L.marker(newAsset.latlng, { icon: newAsset.icon }).bindPopup(`<b>${newAsset.name}</b><br>Type: ${newAsset.type}`);
+                    assetMarkersGroup.addLayer(newMarker);
+                    
+                    addAssetModal.style.display = 'none';
+                    showMessage('Success!', 'New asset added to the map.');
+                });
+
+
+                document.getElementById('print-map-assets').addEventListener('click', () => window.print());
+
+                document.querySelectorAll('#asset-mapping .layer-toggle input').forEach(checkbox => {
+                    checkbox.addEventListener('change', (e) => {
+                        const layerName = e.target.getAttribute('data-layer');
+                        if (mapLayers[layerName]) {
+                            if (e.target.checked) {
+                                assetMap.addLayer(mapLayers[layerName]);
+                            } else {
+                                assetMap.removeLayer(mapLayers[layerName]);
+                            }
+                        }
+                    });
+                });
+            }
+
+            // --- Chart.js Integration ---
+            function initDashboardCharts() {
+                const coverageCtx = document.getElementById('coverage-chart').getContext('2d');
+                charts.coverageChart = new Chart(coverageCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['IFR', 'CFR', 'Pending Claims', 'Unclaimed'],
+                        datasets: [{
+                            data: [10211, 1045, 3450, 5000],
+                            backgroundColor: ['#2c5c1f', '#4a8c31', '#f39c12', '#bdc3c7'],
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right'
+                            },
+                            title: {
+                                display: true,
+                                text: 'FRA Claims Status'
+                            }
+                        }
+                    }
+                });
+
+                const districtCtx = document.getElementById('district-chart').getContext('2d');
+                charts.districtChart = new Chart(districtCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Nuapada', 'Koraput', 'Nabarangpur', 'Kalahandi'],
+                        datasets: [{
+                            label: 'Approved Claims',
+                            data: [3500, 2800, 2100, 1500],
+                            backgroundColor: '#2c5c1f'
+                        }, {
+                            label: 'Pending Claims',
+                            data: [1200, 900, 750, 600],
+                            backgroundColor: '#f39c12'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
+                    }
+                });
+            }
+
+            function initAnalyticsCharts() {
+                const statusCtx = document.getElementById('claims-status-chart').getContext('2d');
+                charts.claimsStatusChart = new Chart(statusCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Approved', 'Pending', 'Rejected'],
+                        datasets: [{
+                            data: [12456, 3450, 850],
+                            backgroundColor: ['#2c5c1f', '#f39c12', '#e74c3c'],
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+
+                const monthlyCtx = document.getElementById('monthly-chart').getContext('2d');
+                charts.monthlyChart = new Chart(monthlyCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+                        datasets: [{
+                            label: 'Claims Processed',
+                            data: [45, 42, 38, 30, 25, 28],
+                            borderColor: '#3498db',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+
+                const tribeCtx = document.getElementById('tribe-chart').getContext('2d');
+                charts.tribeChart = new Chart(tribeCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Gond', 'Santhal', 'Bhil', 'Kandha'],
+                        datasets: [{
+                            label: 'Approved IFR Grants',
+                            data: [2200, 1800, 1500, 2500],
+                            backgroundColor: '#2c5c1f'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+
+                const regionalCtx = document.getElementById('regional-chart').getContext('2d');
+                charts.regionalChart = new Chart(regionalCtx, {
+                    type: 'radar',
+                    data: {
+                        labels: ['Land', 'Water', 'Forest', 'Infrastructure', 'Claims'],
+                        datasets: [{
+                            label: 'Odisha',
+                            data: [65, 59, 90, 81, 56],
+                            fill: true,
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderColor: 'rgb(75, 192, 192)',
+                            pointBackgroundColor: 'rgb(75, 192, 192)',
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: 'rgb(75, 192, 192)'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+
+                document.getElementById('print-analytics').addEventListener('click', () => window.print());
+            }
+
+            document.getElementById('apply-analytics-filters').addEventListener('click', () => {
+                showMessage('Filters Applied', 'Analytics charts have been updated with simulated data.');
+            });
+
+            // --- DSS Integration (Simulated AI) ---
+            if (dssGenerateBtn) {
+                dssGenerateBtn.addEventListener('click', async () => {
+                    const prompt = dssPrompt.value.trim();
+                    if (!prompt) {
+                        showMessage('Error', 'Please enter a query to generate a recommendation.');
+                        return;
+                    }
+
+                    dssOutput.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Generating recommendations...`;
+                    document.getElementById('print-dss').style.display = 'none';
+
+                    const simulatedResponses = [
+                        'Based on the provided data and satellite imagery, promoting sustainable agroforestry practices for tribal communities in the Koraput district is a key recommendation. This approach combines agricultural crops with forest trees, ensuring food security and conserving natural resources. Furthermore, the DSS highlights the need to cross-link with the PM-KISAN scheme to provide direct income support to these farmers, and to utilize MGNREGA for labor-intensive projects like land preparation and planting. Additionally, establishing local processing units for Non-Timber Forest Products (NTFP) will add value and create new livelihood opportunities.',
+                        'The analysis of groundwater data in the region indicates a medium to low index. A primary recommendation is the implementation of the Jal Jeevan Mission, focusing on developing and maintaining micro-watersheds and check dams in hilly areas. This will help to recharge local aquifers and ensure year-round water availability for both agricultural and domestic use. The AI also suggests integrating with the DAJGUA scheme to provide borewell installations in key community lands, ensuring equitable access to water for all patta holders.',
+                        'For effective forest resource management, the DSS recommends a community-based monitoring system using real-time satellite feeds. This allows local tribal groups to protect their CFR forests from illegal logging and encroachment. Policy recommendations include empowering Village Forest Rights Committees (VFRCs) to manage forest resources independently and providing training on scientific forest management techniques. This approach not only conserves biodiversity but also strengthens the community\'s autonomy over their traditional lands.'
+                    ];
+
+                    const randomResponse = simulatedResponses[Math.floor(Math.random() * simulatedResponses.length)];
+
+                    setTimeout(() => {
+                        dssOutput.textContent = randomResponse;
+                        document.getElementById('print-dss').style.display = 'inline-flex';
+                    }, 1500);
+                });
+            }
+            
+
+            document.getElementById('print-dss').addEventListener('click', () => window.print());
+
+            // --- Claims Management ---
+            function renderClaimsTable(filterStatus = 'all') {
+                const userRole = localStorage.getItem('userRole');
+                if (userRole === 'ngo') {
+                    return;
+                }
+                claimsTableBody.innerHTML = '';
+                const filteredClaims = claims.filter(c => filterStatus === 'all' || c.status.toLowerCase() === filterStatus.toLowerCase());
+
+                filteredClaims.forEach(claim => {
+                    const row = document.createElement('tr');
+                    let statusBadgeClass;
+                    switch (claim.status) {
+                        case 'Approved':
+                            statusBadgeClass = 'status-approved';
+                            break;
+                        case 'Pending':
+                            statusBadgeClass = 'status-pending';
+                            break;
+                        case 'Rejected':
+                            statusBadgeClass = 'status-rejected';
+                            break;
+                    }
+
+                    let actionsHtml = '';
+                    if (userRole === 'admin') {
+                        actionsHtml = `
+                            <button class="btn btn-sm btn-secondary view-btn" data-id="${claim.id}"><i class="fas fa-eye"></i></button>
+                            <button class="btn btn-sm btn-primary edit-btn" data-id="${claim.id}"><i class="fas fa-edit"></i></button>
+                            <button class="btn btn-sm btn-accent delete-btn" data-id="${claim.id}"><i class="fas fa-trash"></i></button>
+                        `;
+                    } else if (userRole === 'official') {
+                        actionsHtml = `
+                            <button class="btn btn-sm btn-secondary view-btn" data-id="${claim.id}"><i class="fas fa-eye"></i></button>
+                            <button class="btn btn-sm btn-primary edit-btn" data-id="${claim.id}"><i class="fas fa-edit"></i></button>
+                        `;
+                    }
+
+                    row.innerHTML = `
+                        <td>${claim.id}</td>
+                        <td>${claim.village}</td>
+                        <td>${claim.type}</td>
+                        <td>${claim.date}</td>
+                        <td><span class="status-badge ${statusBadgeClass}">${claim.status}</span></td>
+                        <td class="action-buttons">${actionsHtml}</td>
+                        `;
+                    claimsTableBody.appendChild(row);
+                });
+
+                // Add event listeners for new buttons
+                claimsTableBody.querySelectorAll('.view-btn').forEach(button => {
+                    button.addEventListener('click', () => showMessage('Claim Details', `Viewing details for claim ${button.dataset.id}.`));
+                });
+                claimsTableBody.querySelectorAll('.edit-btn').forEach(button => {
+                    button.addEventListener('click', () => showEditModal(button.dataset.id));
+                });
+                claimsTableBody.querySelectorAll('.delete-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        const claimId = e.currentTarget.dataset.id;
+                        showConfirmation('Confirm Deletion', `Are you sure you want to delete claim ${claimId}?`, () => {
+                            claims = claims.filter(c => c.id !== claimId);
+                            renderClaimsTable();
+                            showMessage('Success!', `Claim ${claimId} has been deleted.`);
+                        });
+                    });
+                });
+
+                const claimsActionsHeader = document.getElementById('claims-actions-header');
+                claimsActionsHeader.style.display = (localStorage.getItem('userRole') === 'admin' || localStorage.getItem('userRole') === 'official') ? '' : 'none';
+            }
+
+            claimsFilter.addEventListener('change', (e) => {
+                renderClaimsTable(e.target.value);
+            });
+
+            document.getElementById('export-claims').addEventListener('click', () => {
+                showMessage('Export Data', 'Data has been exported successfully.');
+            });
+
+            addClaimBtn.addEventListener('click', () => {
+                claimModal.style.display = 'block';
+            });
+
+            closeModalBtn.addEventListener('click', () => {
+                claimModal.style.display = 'none';
+            });
+
+            cancelClaimBtn.addEventListener('click', () => {
+                claimModal.style.display = 'none';
+            });
+
+            submitClaimBtn.addEventListener('click', () => {
+                const newClaim = {
+                    id: 'FRA' + Date.now(),
+                    village: document.getElementById('new-claim-village').value,
+                    type: document.getElementById('new-claim-type').value,
+                    date: new Date().toISOString().slice(0, 10),
+                    status: 'Pending'
+                };
+                claims.push(newClaim);
+                renderClaimsTable();
+                claimModal.style.display = 'none';
+                document.getElementById('new-claim-village').value = '';
+                document.getElementById('new-claim-description').value = '';
+                showMessage('Success!', 'New claim submitted successfully.');
+            });
+
+            function showEditModal(claimId) {
+                const claim = claims.find(c => c.id === claimId);
+                document.getElementById('edit-claim-id').value = claim.id;
+                document.getElementById('edit-claim-village').value = claim.village;
+                document.getElementById('edit-claim-status').value = claim.status;
+                editClaimModal.style.display = 'block';
+            }
+
+            closeEditModalBtn.addEventListener('click', () => editClaimModal.style.display = 'none');
+            cancelEditBtn.addEventListener('click', () => editClaimModal.style.display = 'none');
+
+            saveEditBtn.addEventListener('click', () => {
+                const claimId = document.getElementById('edit-claim-id').value;
+                const updatedClaim = claims.find(c => c.id === claimId);
+                if (updatedClaim) {
+                    updatedClaim.village = document.getElementById('edit-claim-village').value;
+                    updatedClaim.status = document.getElementById('edit-claim-status').value;
+                    renderClaimsTable();
+                    editClaimModal.style.display = 'none';
+                    showMessage('Success!', `Claim ${claimId} has been updated.`);
+                }
+            });
+
+            document.getElementById('print-claims').addEventListener('click', () => window.print());
+
+            // Check if user is already logged in on page load
+            const loggedInUserRole = localStorage.getItem('userRole');
+            if (loggedInUserRole) {
+                loginScreen.style.display = 'none';
+                appContainer.style.display = 'grid';
+                updateUIForUser(loggedInUserRole);
+                initPageContent('dashboard');
+            } else {
+                loginScreen.style.display = 'flex';
+                appContainer.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+
+</html>
